@@ -4,6 +4,8 @@ Panel de mando financiero personal con estética de cabina de aviación. Junta e
 
 Proyecto personal hecho con Flask. Los datos de la demostración son inventados.
 
+> **English:** a personal finance dashboard built with Flask and SQLAlchemy. It projects monthly free cash from payroll, credit cards, installment plans (MSI), rotating savings groups (tandas) and budgets, and includes a payroll and income-tax simulator with a reverse calculator that recovers the gross bonus from the net deposit.
+
 ## Pantallas
 
 | Radar (flujo de efectivo del mes) | Hangar (tarjetas y simulador de nómina) |
@@ -21,6 +23,15 @@ Proyecto personal hecho con Flask. Los datos de la demostración son inventados.
 - **Logística:** tandas con su avance y su turno, compras a MSI con pago mensual, y cargas recurrentes (seguros, suscripciones, ahorro) ligadas a la tarjeta de la que salen.
 - **Conciliación:** cierre mensual. Audita las salidas del mes, reinicia presupuestos y asigna el ahorro a una cuenta destino.
 - **Sistema experto:** reglas simples que avisan de deuda por MSI y de gasto hormiga. El botón de consulta con IA es un marcador de posición para una integración futura.
+
+## Cómo calcula
+
+- **ISR quincenal:** aplica la tarifa del SAT 2026 por tramos (límite inferior, cuota fija y porcentaje sobre el excedente) en `app/utils.py`, y la compara con el ISR que trae el recibo (CFDI) para mostrar la diferencia.
+- **Aguinaldo y prima vacacional:** salario diario por 15 días de aguinaldo y 25 % de prima sobre los días de vacaciones.
+- **Fondo de ahorro:** ciclo anual que arranca el 16 de julio, con 24 quincenas y aportación del empleado igualada al 100 %.
+- **Calculadora inversa:** a partir del depósito que cayó al banco, encuentra el bono bruto que lo produce con una búsqueda binaria sobre el cálculo del ISR (100 iteraciones, precisión al centavo). Sirve para descifrar un recibo cuando solo conoces el neto.
+
+Las tablas de impuestos son una referencia personal, no asesoría fiscal. Verifica los tramos vigentes en el SAT antes de usarlas.
 
 ## Arquitectura
 

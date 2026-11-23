@@ -1,12 +1,12 @@
 import datetime
 import calendar
 
-# Tu TaxCalculator traducido a Python
+# Calculo de ISR quincenal con la tarifa del SAT (portado de una version en Kotlin)
 def calcular_isr_2026_quincenal(sueldo_bruto):
     if sueldo_bruto <= 0:
         return {"cuota": 0.0, "porcentaje": 0.0, "isr_total": 0.0}
 
-    # Tu tabla exacta de Kotlin
+    # (limite inferior, limite superior, cuota fija, % sobre excedente)
     tablas_isr = [
         (0.01, 416.70, 0.00, 0.0192),
         (416.71, 3537.15, 7.95, 0.0640),
