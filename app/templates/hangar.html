@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    /* Radio Buttons Tácticos */
+    .type-pill { display: inline-block; padding: 5px 10px; margin: 2px; border: 1px solid var(--border-color); color: var(--border-color); cursor: pointer; font-size: 0.8em; border-radius: 4px; transition: all 0.2s; }
+    input[type="radio"]:checked + .type-pill { background: var(--aviation-blue); color: #fff; border-color: var(--aviation-blue); font-weight: bold; }
+    input[type="radio"] { display: none; }
+    
+    /* ESTILOS DEL CARRUSEL DE FLOTA */
+    .card-carousel { display: flex; overflow-x: auto; gap: 20px; padding-bottom: 15px; scroll-snap-type: x mandatory; }
+    .card-carousel::-webkit-scrollbar { height: 8px; }
+    .card-carousel::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+    .card-carousel::-webkit-scrollbar-thumb { background: var(--aviation-blue); border-radius: 4px; }
+    .carousel-item { flex: 0 0 320px; scroll-snap-align: start; }
+
+    .input-container {
+    display: flex;
+    gap: 10px; /* Espacio entre los dos campos */
+    }
+
+    .input-field {
+    flex: 1; /* Ambos ocupan el mismo espacio */
+    padding: 10px;
+    box-sizing: border-box; /* Asegura que el padding no rompa el tamaño */
+    white-space: nowrap; /* Evita que el texto salte de línea */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Añade puntos suspensivos si el texto es muy largo */
+    }
+</style>
+
+<!-- HEADER TEK -->
+<div class="flex justify-between items-end border-b border-outline-variant pb-4 mb-8">
+    <div>
+        <h1 class="font-tactical text-3xl tracking-widest text-on-surface uppercase">Fleet Hangar <span class="text-aviation-blue">01</span></h1>
+        <p class="font-data-mono text-xs text-on-surface-variant opacity-70">[ ASSET DEPLOYMENT MODULE // COMBAT READY ]</p>
+    </div>
+    <button onclick="openModalAdd()" class="bg-aviation-blue text-white px-4 py-2 font-data-mono text-xs uppercase font-bold hover:brightness-110 transition-all clipped-corner shadow-md">
+        + DESPLEGAR UNIDAD
+    </button>
+</div>
+
+<!-- ZONE 1: FLEET HANGAR (Tarjetas en Carrusel) -->
+<section class="mb-10">
+    <div class="card-carousel">
+        {% for u in unidades %}
+            {% set inst = u.institucion | upper %}
+            {% set card_color = '#a855f7' if 'NU' in inst else ('#ec4899' if 'LIVERPOOL' in inst else ('#ef4444' if 'SANTANDER' in inst else ('#0ea5e9' if 'BANAMEX' in inst else '#3b82f6'))) %}
+            
+            <div class="carousel-item brushed-metal clipped-corner p-6 border border-outline-variant group hover:border-aviation-blue/50 transition-all relative shadow-sm" style="border-left: 5px solid {{ card_color }};">
+                <div class="absolute top-2 right-2 flex gap-2">
+                    <button onclick="openModalEdit('{{ u.id }}', '{{ u.institucion }}', '{{ u.nombre }}', '{{ u.tipo }}', '{{ u.limite_saldo }}', '{{ u.tasa_anual }}', '{{ u.dia_corte or '' }}', '{{ u.dia_pago or '' }}')" class="text-on-surface-variant hover:text-aviation-blue font-bold text-xs">[E]</button>
+                    <form action="{{ url_for('hangar.delete_unit', id=u.id) }}" method="POST" style="margin:0;">
+                        <button type="submit" class="text-error hover:text-error/80 font-bold text-xs">[X]</button>
+                    </form>
+                </div>
+
+                <div class="flex justify-between items-start mb-8">
+                    <div class="font-tactical text-lg" style="color: {{ card_color }};">{{ inst }}</div>
+                    <span class="font-data-mono text-[10px] px-2 py-0.5 border" style="color: {{ card_color }}; border-color: {{ card_color }};">{{ u.tipo }}</span>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="font-data-mono text-xl text-on-surface tracking-widest opacity-80">{{ u.nombre }}</div>
+                    <!-- Simulación de Número de Tarjeta -->
+                    <div class="font-data-mono text-lg text-on-surface-variant tracking-widest">**** **** **** {{ "%04d"|format((u.id * 8375) % 9999) }}</div> 
+                    
+                    <div class="flex justify-between items-end border-t border-outline-variant/50 pt-3">
+                        <div>
+                            <p class="font-data-mono text-[9px] text-on-surface-variant uppercase">{% if u.tipo == 'AHORRO' %}SALDO{% else %}LÍMITE{% endif %}</p>
+                            <p class="font-data-mono text-lg font-bold" style="color: {{ card_color }};">${{ "%.2f"|format(u.limite_saldo) }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-data-mono text-[9px] text-on-surface-variant uppercase">{% if u.tipo == 'AHORRO' %}TASA ANUAL{% else %}CORTE / PAGO{% endif %}</p>
+                            <p class="font-data-mono text-sm text-on-surface font-bold">{% if u.tipo == 'AHORRO' %}{{ u.tasa_anual }}%{% else %}DÍA {{ u.dia_corte or '--' }} / {{ u.dia_pago }}{% endif %}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- ZONE 2: MISSION BRIEFING / PAYROLL -->
+<section class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+    <!-- TACTICAL SIMULATOR (Input Form) -->
+    <div class="xl:col-span-8 bg-surface border border-outline-variant clipped-corner p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-6 border-b border-outline-variant pb-3">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-aviation-blue">analytics</span>
+                <h2 class="font-tactical text-xl text-on-surface">Mission Briefing: <span class="text-aviation-blue">PAYROLL_SIM</span></h2>
+            </div>
+        </div>
+        
+        <form method="POST" action="{{ url_for('hangar.index') }}" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <input type="hidden" name="action" value="update_params">
+            <div class="space-y-6">
+                <div class="bg-white/60 border-l-4 border-aviation-blue p-3 shadow-sm">
+                    <label class="block font-data-mono text-[10px] text-aviation-blue mb-2 font-bold">SUELDO BRUTO QUINCENAL</label>
+                    <div class="relative"><span class="absolute left-0 top-1/2 -translate-y-1/2 text-aviation-blue font-bold">$</span><input class="w-full bg-transparent border-b border-outline-variant text-on-surface font-data-mono pl-4 py-1 focus:border-aviation-blue focus:outline-none" type="number" step="0.01" name="grossSalary" value="{{ user.sueldo_bruto_quincenal }}"></div>
+                </div>
+                <div class="bg-white/60 border-l-4 border-aviation-blue p-3 shadow-sm">
+                    <label class="block font-data-mono text-[10px] text-aviation-blue mb-2 font-bold">ISR RETENIDO (CFDI)</label>
+                    <div class="relative"><span class="absolute left-0 top-1/2 -translate-y-1/2 text-aviation-blue font-bold">$</span><input class="w-full bg-transparent border-b border-outline-variant text-on-surface font-data-mono pl-4 py-1 focus:border-aviation-blue focus:outline-none" type="number" step="0.01" name="isrCfdi" value="{{ user.isr_cfdi }}"></div>
+                </div>
+                <div class="bg-white/60 border-l-4 border-aviation-blue p-3 shadow-sm">
+                    <label class="block font-data-mono text-[10px] text-aviation-blue mb-2 font-bold">IMSS (CFDI)</label>
+                    <div class="relative"><span class="absolute left-0 top-1/2 -translate-y-1/2 text-aviation-blue font-bold">$</span><input class="w-full bg-transparent border-b border-outline-variant text-on-surface font-data-mono pl-4 py-1 focus:border-aviation-blue focus:outline-none" type="number" step="0.01" name="imssCfdi" value="{{ user.imss_cfdi }}"></div>
+                </div>
+            </div>
+            
+            <div class="space-y-6 flex flex-col">
+                <div class="bg-white/60 border-l-4 border-aviation-blue p-3 shadow-sm">
+                    <label class="block font-data-mono text-[10px] text-aviation-blue mb-2 font-bold">FONDO DE AHORRO</label>
+                    <div class="relative"><span class="absolute left-0 top-1/2 -translate-y-1/2 text-aviation-blue font-bold">$</span><input class="w-full bg-transparent border-b border-outline-variant text-on-surface font-data-mono pl-4 py-1 focus:border-aviation-blue focus:outline-none" type="number" step="0.01" name="savingsContribution" value="{{ user.aportacion_ahorro }}"></div>
+                </div>
+                <div class="flex gap-4">
+                    <div class="bg-white/60 border-l-4 border-aviation-blue p-3 shadow-sm flex-1">
+                        <label class="block font-data-mono text-[10px] text-aviation-blue mb-2 font-bold">FECHA INGRESO</label>
+                        <input class="w-full bg-transparent border-b border-outline-variant text-on-surface font-data-mono py-1 focus:outline-none" type="date" name="startDate" value="{{ user.fecha_inicio }}">
+                    </div>
+                    <div class="bg-white/60 border-l-4 border-aviation-blue p-3 shadow-sm w-24">
+                        <label class="block font-data-mono text-[10px] text-aviation-blue mb-2 font-bold">VACAC.</label>
+                        <input class="w-full bg-transparent border-b border-outline-variant text-on-surface font-data-mono py-1 text-center focus:outline-none" type="number" name="vacationDays" value="{{ user.dias_vacaciones }}">
+                    </div>
+                </div>
+                
+                <div class="flex-grow flex items-end mt-4">
+                    <button type="submit" class="w-full h-12 bg-aviation-blue text-white font-tactical tracking-widest clipped-corner hover:bg-primary transition-all shadow-md text-sm">RE-CALCULATE TELEMETRY</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- LOAD STATISTICS & PROJECTIONS -->
+    <div class="xl:col-span-4 space-y-6">
+        <!-- NET PAY SUMMARY -->
+        <div class="bg-aviation-blue text-white clipped-corner p-6 shadow-xl relative overflow-hidden">
+            <div class="absolute -right-4 -bottom-4 opacity-10"><span class="material-symbols-outlined text-[100px]">verified_user</span></div>
+            <div class="font-data-mono text-[10px] tracking-widest opacity-80 mb-2 uppercase">Calculated Net Pay</div>
+            <div class="font-tactical text-4xl mb-2 font-bold">${{ "%.2f"|format(neto_real) }}</div>
+            <p class="font-data-mono text-[10px] opacity-70">PER PAY PERIOD (BI-WEEKLY)</p>
+        </div>
+
+        <!-- SAT BRACKETS & ANNUAL -->
+        <div class="brushed-metal border border-outline-variant p-6 clipped-corner shadow-sm">
+            <h3 class="font-data-mono text-on-surface mb-4 pb-2 border-b border-outline-variant text-[11px] font-bold tracking-wider">SYSTEM TELEMETRY</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between font-data-mono text-xs"><span class="text-on-surface-variant">TAX BRACKET (SAT)</span><span class="text-aviation-blue font-bold">{{ "%.2f"|format(isr_app.porcentaje) }}%</span></div>
+                <div class="flex justify-between font-data-mono text-xs"><span class="text-on-surface-variant">ISR DIFERENCIA</span><span class="{% if isr_diff|abs > 1 %}text-error{% else %}text-success{% endif %} font-bold">${{ "%.2f"|format(isr_diff) }}</span></div>
+                <div class="flex justify-between font-data-mono text-xs mt-2 pt-2 border-t border-outline-variant/50"><span class="text-on-surface-variant">AGUINALDO EST.</span><span class="text-on-surface font-bold">${{ "%.2f"|format(aguinaldo) }}</span></div>
+                <div class="flex justify-between font-data-mono text-xs"><span class="text-on-surface-variant">PRIMA VACACIONAL</span><span class="text-on-surface font-bold">${{ "%.2f"|format(prima) }}</span></div>
+            </div>
+            
+            <button onclick="document.getElementById('modal-simulacion').style.display='flex'" class="w-full mt-6 bg-white border border-[#a855f7] text-[#a855f7] py-2 font-data-mono text-xs font-bold hover:bg-[#a855f7] hover:text-white transition-colors">
+                [+] SIMULAR BONOS / INVERSA
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- MODALES (PEGAR AQUÍ LOS DE HANGAR Y EL DE SIMULACIÓN) -->
+<!-- Modal: Crear/Editar Unidad -->
+<div id="modal-add" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-6 border border-aviation-blue shadow-lg" style="width: 400px; max-width: 95%;">
+        <h3 id="modal-title" class="font-tactical text-aviation-blue text-lg mb-4 border-b border-outline-variant pb-2">DESPLEGAR NUEVA UNIDAD</h3>
+        <form id="form-hangar" action="{{ url_for('hangar.add_unit') }}" method="POST" class="space-y-4">
+            <input type="text" id="in-inst" name="institucion" placeholder="Institución (Ej. BBVA)" class="aero-input" required>
+            <input type="text" id="in-nom" name="nombre" placeholder="Alias (Ej. Tarjeta Oro)" class="aero-input" required>
+
+            <div class="flex flex-wrap gap-2 p-2 bg-white/50 border border-outline-variant">
+                <label><input type="radio" name="tipo" value="CREDITO" checked onchange="toggleFields()"><span class="type-pill">Crédito</span></label>
+                <label><input type="radio" name="tipo" value="AHORRO" onchange="toggleFields()"><span class="type-pill">Ahorro</span></label>
+                <label><input type="radio" name="tipo" value="DEPARTAMENTAL" onchange="toggleFields()"><span class="type-pill">Dept.</span></label>
+                <label><input type="radio" name="tipo" value="DEBITO" onchange="toggleFields()"><span class="type-pill">Débito</span></label>
+            </div>
+
+            <div id="field-limite-saldo"><input type="number" step="0.01" id="in-lim" name="limite_saldo" placeholder="Límite / Saldo" class="aero-input" required></div>
+            <div id="field-ahorro" style="display: none;"><input type="number" step="0.01" id="in-tasa" name="tasa_anual" placeholder="Tasa Anual %" class="aero-input"></div>
+            <div id="field-fechas" class="flex gap-4">
+                <input type="number" id="in-corte" name="dia_corte" placeholder="Día Corte" class="aero-input">
+                <input type="number" id="in-pago" name="dia_pago" placeholder="Día Límite" class="aero-input">
+            </div>
+
+            <div class="flex justify-end gap-4 mt-6 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-add').style.display='none'" class="text-on-surface-variant text-sm font-bold hover:text-error">CANCELAR</button>
+                <button type="submit" class="bg-aviation-blue text-white px-4 py-2 font-bold text-sm clipped-corner hover:brightness-110">CONFIRMAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Calculadora Inversa / Simulación -->
+<div id="modal-simulacion" style="display: {% if show_modal %}flex{% else %}none{% endif %}; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-6 border border-[#a855f7] shadow-[0_0_20px_rgba(168,85,247,0.3)]" style="width: 500px; max-width: 95%;">
+        <h2 class="font-tactical text-xl text-[#a855f7] mb-2 border-b border-[#a855f7]/30 pb-2">{% if simulacion.es_inverso %}RECIBO DESCIFRADO{% else %}ANÁLISIS DE DEPÓSITO IDEAL{% endif %}</h2>
+        
+        <div class="bg-white/40 p-4 border border-[#a855f7] mb-4">
+            <p class="text-[10px] text-on-surface-variant mb-3 font-bold uppercase">Ingresa el monto del banco y el fondo de ahorro para descifrar tu bono real.</p>
+            <form method="POST" action="{{ url_for('hangar.index') }}" class="flex flex-col gap-3">
+                <input type="hidden" name="action" value="reverse_calc">
+                <!-- Contenedor con ancho específico para cada uno -->
+                <div class="flex gap-2 w-full">
+                    <!-- Banco: más pequeño (flex-none + ancho fijo) -->
+                    <div class="flex-none w-1/2 relative">
+                        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-[10px]">BANCO:</span>
+                        <input type="number" step="0.01" name="deposito_real" placeholder="Ej. 46476.60" class="aero-input bg-white w-full pl-14 text-xs" required>
+                    </div>
+                    <!-- Ahorro: ocupa el resto (flex-1) -->
+                    <div class="flex-1 relative">
+                        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-[10px]">AHORRO:</span>
+                        <input type="number" step="0.01" name="fondo_real" placeholder="{{ ahorro_acumulado }}" class="aero-input bg-white w-full pl-16 text-xs">
+                    </div>
+                </div>
+                <button type="submit" class="bg-[#a855f7] text-white px-4 py-2 font-bold text-sm clipped-corner hover:brightness-110">DESCIFRAR CRIPTOGRAFÍA SAT</button>
+            </form>
+        </div>
+
+        <div class="font-data-mono text-xs space-y-2">
+            <div class="flex justify-between"><span>Quincena Base (Bruta):</span> <strong class="text-on-surface">${{ "%.2f"|format(user.sueldo_bruto_quincenal) }}</strong></div>
+            <div class="flex justify-between border-b border-outline-variant pb-1">
+                <span class="text-aviation-blue font-bold">[+] Bono (Bruto):</span> 
+                <strong class="text-aviation-blue">+${{ "%.2f"|format(simulacion.bono_bruto) }} <span class="text-success text-[10px]">({{ "%.1f"|format(simulacion.dias_bono) }} Días)</span></strong>
+            </div>
+            <div class="flex justify-between font-bold text-on-surface pt-1"><span>BASE GRAVABLE SAT:</span> <span>${{ "%.2f"|format(simulacion.bruto_total) }}</span></div>
+            
+            <div class="bg-error/10 border-l-4 border-error p-3 my-3 shadow-inner">
+                <div class="flex justify-between text-error font-bold mb-1"><span>[-] ISR Retenido:</span> <span>-${{ "%.2f"|format(simulacion.isr_retenido) }}</span></div>
+                <span class="text-[10px] text-on-surface-variant">El SAT te subió al bracket del <strong class="text-warning">{{ "%.2f"|format(simulacion.bracket) }}%</strong>. Pagaste ${{ "%.2f"|format(simulacion.impacto_isr) }} extra por juntar los pagos.</span>
+            </div>
+
+            <div class="flex justify-between border-b border-outline-variant pb-1"><span class="text-success font-bold">[+] Ahorro (Exento):</span> <strong class="text-success">+${{ "%.2f"|format(simulacion.ahorro_entregado) }}</strong></div>
+        </div>
+
+        <div class="text-center mt-6 border-t border-[#a855f7]/30 pt-4">
+            <h3 class="text-[10px] text-on-surface-variant uppercase">{% if simulacion.es_inverso %}DEPÓSITO EN BANCO{% else %}DEPÓSITO NETO ESPERADO{% endif %}</h3>
+            <h1 class="font-tactical text-4xl text-[#a855f7] mt-1">$ {{ "%.2f"|format(simulacion.deposito_final) }}</h1>
+        </div>
+
+        <div class="text-center mt-6">
+            <button onclick="document.getElementById('modal-simulacion').style.display='none'" class="text-on-surface-variant font-bold text-sm hover:text-[#a855f7] transition-colors">CERRAR ANÁLISIS</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    function toggleFields() {
+        const tipo = document.querySelector('input[name="tipo"]:checked').value;
+        document.getElementById('field-fechas').style.display = (tipo === 'CREDITO' || tipo === 'DEPARTAMENTAL') ? 'flex' : 'none';
+        document.getElementById('in-corte').style.display = (tipo === 'CREDITO') ? 'block' : 'none';
+        document.getElementById('field-ahorro').style.display = (tipo === 'AHORRO') ? 'block' : 'none';
+        document.getElementById('in-lim').placeholder = (tipo === 'CREDITO' || tipo === 'DEPARTAMENTAL') ? 'Límite de Crédito' : 'Saldo Actual';
+    }
+
+    function openModalAdd() {
+        document.getElementById('modal-title').innerText = "DESPLEGAR NUEVA UNIDAD";
+        document.getElementById('form-hangar').action = "{{ url_for('hangar.add_unit') }}";
+        document.getElementById('form-hangar').reset();
+        toggleFields();
+        document.getElementById('modal-add').style.display = 'flex';
+    }
+
+    function openModalEdit(id, inst, nom, tipo, lim, tasa, corte, pago) {
+        document.getElementById('modal-title').innerText = "RECONFIGURAR UNIDAD";
+        document.getElementById('form-hangar').action = "/hangar/edit/" + id;
+        document.getElementById('in-inst').value = inst;
+        document.getElementById('in-nom').value = nom;
+        document.querySelector(`input[name="tipo"][value="${tipo}"]`).checked = true;
+        document.getElementById('in-lim').value = lim;
+        document.getElementById('in-tasa').value = tasa;
+        document.getElementById('in-corte').value = corte;
+        document.getElementById('in-pago').value = pago;
+        toggleFields();
+        document.getElementById('modal-add').style.display = 'flex';
+    }
+</script>
+{% endblock %}

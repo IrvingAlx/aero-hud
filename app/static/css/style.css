@@ -1,0 +1,162 @@
+/* IMPORTACIÓN DE TIPOGRAFÍA TÁCTICA */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;600;700&family=Orbitron:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+:root {
+    /* MODO LIGHT (Aero-Steel / F-22 Raptor) - DATOS DEL PROMPT */
+    --bg-color: #f1f3f7; 
+    --panel-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%);
+    --text-main: #1a202c;
+    --hud-accent: #0047AB; /* Aviation Blue */
+    --border-color: #cbd5e0;
+    --alert-danger: #dc2626;
+    --input-bg: #e2e8f0;
+    --input-text: #0047AB;
+    --grid-color: rgba(0, 71, 171, 0.05);
+    --metal-noise: rgba(0,0,0,0.02);
+}
+
+[data-theme="dark"] {
+    /* MODO DARK (Stealth Black / SR-71) */
+    --bg-color: #050505;
+    --panel-bg: linear-gradient(135deg, #111111 0%, #0a0a0a 50%, #000000 100%);
+    --text-main: #e2e8f0;
+    --hud-accent: #00ff41; /* Verde Fósforo */
+    --border-color: #004400;
+    --alert-danger: #ff003c;
+    --input-bg: #0a0a0a;
+    --input-text: #00ff41;
+    --grid-color: rgba(0, 255, 65, 0.03);
+    --metal-noise: rgba(255,255,255,0.01); /* Efecto Fibra de Carbono */
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    font-family: 'JetBrains Mono', monospace; /* Default para datos */
+    transition: background-color 0.3s ease, color 0.3s ease;
+    margin: 0;
+    padding: 0;
+    /* Grid de Fondo Aeroespacial */
+    background-image: 
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 30px 30px;
+}
+
+/* === LÍNEA DE ESCANEO DE RADAR === */
+.scanline {
+    position: fixed;
+    height: 2px;
+    width: 100%;
+    background: var(--grid-color);
+    top: 0;
+    left: 0;
+    animation: scan 8s linear infinite;
+    pointer-events: none;
+    z-index: 9999;
+}
+@keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+
+/* === PANELES Y MODALES (BRUSHED METAL + BEVELED EDGES) === */
+.hud-panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    padding: 20px;
+    margin-bottom: 20px;
+    position: relative;
+    /* Efecto "Clipped Corner" / Esquinas recortadas tácticas */
+    clip-path: polygon(0 0, 97% 0, 100% 15px, 100% 100%, 3% 100%, 0 calc(100% - 15px));
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+/* Ruido de metal cepillado o fibra de carbono */
+.hud-panel::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(45deg, var(--metal-noise) 0px, var(--metal-noise) 1px, transparent 1px, transparent 8px);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Asegurar que el contenido del panel quede encima del ruido metálico */
+.hud-panel > * { position: relative; z-index: 1; }
+
+/* Tipografía de Títulos (Orbitron / Space Grotesk) */
+.hud-title {
+    color: var(--hud-accent);
+    font-family: 'Space Grotesk', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    margin-top: 0;
+    padding-bottom: 5px;
+}
+
+.tactical-font { font-family: 'Orbitron', sans-serif; }
+
+/* === INPUTS Y BOTONES TÁCTICOS === */
+.aero-input {
+    width: 100%;
+    padding: 10px 15px;
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border: 1px solid var(--border-color);
+    border-bottom: 2px solid var(--hud-accent); /* Estilo input moderno */
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%);
+}
+.aero-input:focus {
+    outline: none;
+    border-color: var(--hud-accent);
+    background-color: transparent;
+}
+
+button {
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    clip-path: polygon(8% 0, 100% 0, 100% 75%, 92% 100%, 0 100%, 0 25%); /* Botón Biselado */
+    transition: transform 0.1s ease, filter 0.2s ease;
+}
+button:active { transform: scale(0.97); }
+button:hover { filter: brightness(1.2); }
+
+/* === BARRAS DE ENERGÍA Y PROGRESO === */
+.energy-bar-bg {
+    background: var(--input-bg);
+    width: 100%;
+    position: relative;
+    border-radius: 2px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+.energy-bar-fill {
+    height: 100%;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.energy-bar-text {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffffff;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    white-space: nowrap;
+}
+
+#recon-transactions-list::-webkit-scrollbar {
+    width: 6px;
+}
+#recon-transactions-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+}
+#recon-transactions-list::-webkit-scrollbar-thumb {
+    background: var(--hud-accent, #eab308); /* Color warning / dorado */
+    border-radius: 2px;
+}

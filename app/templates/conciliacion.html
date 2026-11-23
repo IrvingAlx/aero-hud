@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- HEADER CENTRO DE MANDO -->
+<div class="flex justify-between items-end border-b border-outline-variant pb-4 mb-8">
+    <div>
+        <h1 class="font-tactical text-3xl tracking-widest text-on-surface uppercase">CENTRO DE CONCILIACIÓN <span class="text-warning">[AUDITORÍA]</span></h1>
+        <p class="font-data-mono text-xs text-on-surface-variant opacity-70">[ AUDITORÍA DE SALIDAS, REINICIO DE PRESUPUESTOS Y ASIGNACIÓN DE AHORRO ]</p>
+    </div>
+    <form method="POST" action="{{ url_for('radar.conciliacion') }}">
+        <input type="hidden" name="action" value="seal_month_global">
+        <button type="submit" class="bg-warning text-black px-6 py-2 font-data-mono text-xs uppercase font-bold hover:brightness-110 transition-all clipped-corner shadow-md flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">task_alt</span> SELLAR MES COMPLETO
+        </button>
+    </form>
+</div>
+
+<!-- ======================================================= -->
+<!-- PANEL MAESTRO: ESTRATEGIA DE PAGO MENSUAL -->
+<!-- ======================================================= -->
+<section class="mb-10">
+    <div class="brushed-metal clipped-corner p-6 border {% if estrategia.flujo < 0 %}border-error/50 shadow-[0_0_15px_rgba(220,38,38,0.2)]{% else %}border-success/50 shadow-md{% endif %}">
+        <div class="flex items-center justify-between mb-4 border-b border-outline-variant/30 pb-2">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined {% if estrategia.flujo < 0 %}text-error{% else %}text-success{% endif %} text-2xl">account_balance</span>
+                <h2 class="font-headline-md text-lg text-on-surface tracking-tight uppercase">Estrategia de Pago <span class="{% if estrategia.flujo < 0 %}text-error{% else %}text-success{% endif %}">[{{ estrategia.nombre_mes }}]</span></h2>
+            </div>
+            <div class="text-right font-data-mono">
+                <p class="text-[9px] text-on-surface-variant uppercase">Ingreso Neto (Quincena x2)</p>
+                <div class="flex items-center justify-end gap-2">
+                    <p class="text-xl font-bold text-aviation-blue">${{ "%.2f"|format(estrategia.ingreso) }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- COLUMNA 1: DEUDA DE TARJETAS SELLADAS -->
+            <div class="bg-white/40 p-4 border-l-2 border-[#8b5cf6]">
+                <h3 class="font-label-caps text-[10px] text-on-surface-variant mb-3 tracking-widest">1. TARJETAS (CORTES SELLADOS)</h3>
+                <ul class="space-y-2 font-data-mono text-xs">
+                    {% for t in estrategia.tarjetas %}
+                        <div class="flex justify-between items-center border-b border-outline-variant/20 pb-1">
+                            <div>
+                                <span class="font-bold text-on-surface">{{ t.institucion }}</span>
+                                <p class="text-[8px] text-on-surface-variant">Pago Límite: Día {{ t.dia_pago or '--' }}</p>
+                            </div>
+                            <span class="font-bold text-error">-${{ "%.2f"|format(t.deuda_corte) }}</span>
+                        </div>
+                    {% else %}
+                        <li class="text-on-surface-variant opacity-60 text-center py-2">Sin tarjetas conciliadas este mes.</li>
+                    {% endfor %}
+                </ul>
+                <div class="flex justify-between mt-3 pt-2 border-t border-outline-variant/50 font-bold text-sm">
+                    <span class="text-on-surface-variant">Subtotal:</span>
+                    <span class="text-error">-${{ "%.2f"|format(estrategia.tarjetas_total) }}</span>
+                </div>
+            </div>
+
+            <!-- COLUMNA 2: GASTOS FIJOS LOGÍSTICOS -->
+            <div class="bg-white/40 p-4 border-l-2 border-warning">
+                <h3 class="font-label-caps text-[10px] text-on-surface-variant mb-3 tracking-widest">2. GASTOS FIJOS (EXTERNAL)</h3>
+                <ul class="space-y-2 font-data-mono text-xs">
+                    {% for f in estrategia.fijos_list %}
+                        <div class="flex justify-between items-center border-b border-outline-variant/20 pb-1">
+                            <span class="text-on-surface">{{ f.concepto }}</span>
+                            <span class="font-bold text-error">-${{ "%.2f"|format(f.monto * 2 if f.frecuencia == 'QUINCENAL' else f.monto) }}</span>
+                        </div>
+                    {% else %}
+                        <li class="text-on-surface-variant opacity-60 text-center py-2">Sin gastos fijos registrados.</li>
+                    {% endfor %}
+                </ul>
+                <div class="flex justify-between mt-3 pt-2 border-t border-outline-variant/50 font-bold text-sm">
+                    <span class="text-on-surface-variant">Subtotal:</span>
+                    <span class="text-error">-${{ "%.2f"|format(estrategia.fijos_total) }}</span>
+                </div>
+            </div>
+
+            <!-- COLUMNA 3: TANDAS -->
+            <div class="bg-white/40 p-4 border-l-2 border-aviation-blue">
+                <h3 class="font-label-caps text-[10px] text-on-surface-variant mb-3 tracking-widest">3. TANDAS ACTIVAS</h3>
+                <ul class="space-y-2 font-data-mono text-xs">
+                    <div class="flex justify-between items-center border-b border-outline-variant/20 pb-1">
+                        <span class="text-on-surface">TANDAS (Mes Completo)</span>
+                        <span class="font-bold text-error">-${{ "%.2f"|format(estrategia.tandas) }}</span>
+                    </div>
+                </ul>
+                <div class="flex justify-between mt-3 pt-2 border-t border-outline-variant/50 font-bold text-sm">
+                    <span class="text-on-surface-variant">Subtotal:</span>
+                    <span class="text-error">-${{ "%.2f"|format(estrategia.tandas) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULTADO FINAL Y PROTOCOLOS -->
+        <div class="mt-6 border-t border-outline-variant/50 pt-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="font-data-mono">
+                <p class="text-[10px] text-on-surface-variant uppercase mb-1">Total Comprometido del Mes:</p>
+                <p class="text-xl font-bold text-on-surface">${{ "%.2f"|format(estrategia.total_comprometido) }}</p>
+            </div>
+
+            <div class="p-4 flex-1 w-full {% if estrategia.flujo < 0 %}bg-error/10 border border-error{% else %}bg-success/10 border border-success{% endif %}">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-tactical tracking-widest {% if estrategia.flujo < 0 %}text-error{% else %}text-success{% endif %}">EFECTIVO DISPONIBLE:</span>
+                    <span class="font-tactical text-2xl {% if estrategia.flujo < 0 %}text-error{% else %}text-success{% endif %}">${{ "%.2f"|format(estrategia.flujo) }}</span>
+                </div>
+                
+                {% if estrategia.flujo < 0 %}
+                    <p class="font-data-mono text-[10px] text-error font-bold mt-2">
+                        <span class="material-symbols-outlined text-[12px] inline-block align-middle">warning</span> 
+                        ALERTA DE DÉFICIT: No cuentas con liquidez suficiente este mes. Debes retirar <strong class="text-black bg-error px-1">${{ "%.2f"|format(estrategia.flujo|abs) }}</strong> de tu fondo de ahorro para cubrir los pagos. 
+                        Este monto se registrará como deuda propia a reponer en meses futuros.
+                    </p>
+                {% else %}
+                    <p class="font-data-mono text-[10px] text-success font-bold mt-2">
+                        <span class="material-symbols-outlined text-[12px] inline-block align-middle">check_circle</span> 
+                        ESTATUS NOMINAL: Tienes liquidez suficiente para cubrir todas las obligaciones de este mes y te sobran fondos para presupuestos variables o ahorro extra.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- BLOQUE 1: AUDITORÍA Y ASIGNACIÓN DE DEPÓSITOS DE AHORRO -->
+<section class="mb-10">
+    <div class="brushed-metal clipped-corner p-6 border border-success/40 shadow-md">
+        <div class="flex items-center gap-2 mb-4 border-b border-success/30 pb-2">
+            <span class="material-symbols-outlined text-success text-2xl">savings</span>
+            <h2 class="font-headline-md text-lg text-success tracking-tight uppercase">Depósitos de Ahorro y Cuentas Destino</h2>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for g in gastos_ahorro %}
+                <div class="bg-white/60 border border-success/30 p-4 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <span class="text-[9px] font-bold text-success border border-success px-1">AHORRO REGISTRADO</span>
+                        <h3 class="font-bold text-on-surface text-sm mt-1">{{ g.concepto }}</h3>
+                        <p class="font-data-mono text-xs text-on-surface-variant">Monto estimado: <strong class="text-success">${{ "%.2f"|format(g.monto) }}</strong></p>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('radar.conciliacion') }}" class="mt-4 pt-3 border-t border-outline-variant/30 flex gap-2">
+                        <input type="hidden" name="action" value="transfer_savings">
+                        <input type="hidden" name="monto" value="{{ g.monto }}">
+                        
+                        <select name="hangar_unit_id" class="aero-input bg-white text-xs font-bold flex-1" required>
+                            <option value="">SELECCIONAR CUENTA DESTINO...</option>
+                            {% for u in unidades %}{% if u.tipo in ['AHORRO', 'DEBITO'] %}
+                                <option value="{{ u.id }}">{{ u.institucion }} - {{ u.nombre }} (Saldo: ${{ "%.2f"|format(u.limite_saldo) }})</option>
+                            {% endif %}{% endfor %}
+                        </select>
+                        <button type="submit" class="bg-success text-white px-3 py-1 font-bold text-xs clipped-corner hover:brightness-110">ABONAR</button>
+                    </form>
+                </div>
+            {% else %}
+                <p class="font-data-mono text-xs text-on-surface-variant">No hay gastos etiquetados como Ahorro.</p>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- BLOQUE 2: RESETEO Y SELLADO DE PRESUPUESTOS VARIABLES -->
+<section class="mb-10">
+    <div class="brushed-metal clipped-corner p-6 border border-aviation-blue/40 shadow-md">
+        <div class="flex items-center gap-2 mb-4 border-b border-aviation-blue/30 pb-2">
+            <span class="material-symbols-outlined text-aviation-blue text-2xl">published_with_changes</span>
+            <h2 class="font-headline-md text-lg text-aviation-blue tracking-tight uppercase">Sellar y Reiniciar Presupuestos (Menú Principal a $0.00)</h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {% for b in presupuestos %}
+                <div class="bg-white/60 border border-outline-variant p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-on-surface text-sm">{{ b.nombre }}</h3>
+                            {% if b.ultimo_mes_reseteo == hoy.month %}
+                                <span class="bg-success/20 text-success border border-success px-1 text-[8px] font-bold">RESETEADO AGOSTO</span>
+                            {% else %}
+                                <span class="bg-warning/20 text-warning border border-warning px-1 text-[8px] font-bold">PERIODO ANTERIOR</span>
+                            {% endif %}
+                        </div>
+                        <p class="font-data-mono text-xs text-on-surface-variant">Consumido: <strong class="text-error">${{ "%.2f"|format(b.monto_gastado) }}</strong> / Límite: ${{ "%.2f"|format(b.limite_maximo) }}</p>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('radar.conciliacion') }}" class="mt-4 pt-2 border-t border-outline-variant/30 text-right">
+                        <input type="hidden" name="action" value="seal_budget">
+                        <input type="hidden" name="budget_id" value="{{ b.id }}">
+                        <button type="submit" class="bg-aviation-blue text-white px-3 py-1 font-bold text-xs clipped-corner hover:brightness-110 w-full">
+                            REINICIAR A $0.00 PARA AGOSTO
+                        </button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- BLOQUE 3: AUDITORÍA Y SELLADO DE TARJETAS POR CORTE -->
+<section class="mb-10">
+    <div class="brushed-metal clipped-corner p-6 border border-warning/40 shadow-md">
+        <div class="flex items-center gap-2 mb-4 border-b border-warning/30 pb-2">
+            <span class="material-symbols-outlined text-warning text-2xl">credit_score</span>
+            <h2 class="font-headline-md text-lg text-warning tracking-tight uppercase">Auditoría de Estados de Cuenta de Tarjetas</h2>
+        </div>
+
+        <div class="space-y-6">
+            {% for u_id, item in tarjetas_recon.items() %}
+                {% set u = item.unidad %}
+                {% if u.tipo in ['CREDITO', 'DEPARTAMENTAL'] %}
+                    <div class="bg-white/60 border border-outline-variant p-5 shadow-sm">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-outline-variant/50 pb-3 mb-4 gap-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-tactical text-lg text-on-surface">{{ u.institucion }} - {{ u.nombre }}</h3>
+                                    {% if item.conciliada %}
+                                        <span class="bg-success text-white px-2 py-0.5 text-[9px] font-bold">CONCILIADA [AGOSTO]</span>
+                                    {% else %}
+                                        <span class="bg-warning text-black px-2 py-0.5 text-[9px] font-bold">PENDIENTE CORTE</span>
+                                    {% endif %}
+                                </div>
+                                <p class="font-data-mono text-xs text-aviation-blue font-bold mb-2">CICLO AUDITADO: {{ item.periodo_str }}</p>
+                                
+                                <!-- VALIDACIÓN MATEMÁTICA: SUMA SISTEMA VS SELLO MANUAL -->
+                                <div class="flex items-center gap-3 text-[10px] font-data-mono bg-black/5 dark:bg-white/5 p-1.5 border border-outline-variant/30 rounded-sm inline-flex">
+                                    <span class="text-on-surface-variant">Suma del Sistema: <strong class="text-on-surface">${{ "%.2f"|format(item.suma_calculada) }}</strong></span>
+                                    
+                                    {% if item.conciliada %}
+                                        <span class="text-on-surface-variant">Valor Sellado: <strong class="text-warning">${{ "%.2f"|format(item.deuda_sellada) }}</strong></span>
+                                        {% set diff = item.suma_calculada - item.deuda_sellada %}
+                                        {% if diff > -0.05 and diff < 0.05 %}
+                                            <span class="text-success font-bold flex items-center gap-1 ml-2"><span class="material-symbols-outlined text-[12px]">verified</span> CUADRADO</span>
+                                        {% else %}
+                                            <span class="text-error font-bold flex items-center gap-1 ml-2"><span class="material-symbols-outlined text-[12px]">warning</span> DESCUADRE: ${{ "%.2f"|format(diff) }}</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <form method="POST" action="{{ url_for('radar.conciliacion') }}" class="flex items-center gap-2 w-full md:w-auto">
+                                <input type="hidden" name="action" value="seal_card">
+                                <input type="hidden" name="hangar_unit_id" value="{{ u.id }}">
+                                
+                                <!-- El value ahora toma item.total_input para respetar el sello -->
+                                <input type="number" step="0.01" name="deuda_real" placeholder="Saldo Banco $" class="aero-input bg-white text-xs font-bold w-32" value="{{ item.total_input }}" required>
+                                <input type="number" step="0.01" name="abono_realizado" placeholder="Abono $" class="aero-input bg-white text-xs font-bold w-28">
+                                
+                                <button type="submit" class="bg-warning text-black px-4 py-2 font-bold text-xs clipped-corner hover:brightness-110 whitespace-nowrap">
+                                    SELLAR TARJETA
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- DESGLOSE DE MOVIMIENTOS DEL CORTE -->
+                        <div class="max-h-48 overflow-y-auto space-y-1 pr-2">
+                            {% for tx in item.txs %}
+                                <div class="group flex justify-between items-center text-xs font-data-mono p-1.5 bg-black/5 dark:bg-white/5 border-b border-outline-variant/20 hover:border-aviation-blue/50 transition-colors">
+                                    <span class="flex items-center gap-2">
+                                        <span class="text-aviation-blue font-bold text-[9px] w-6">{{ tx.tipo }}</span> 
+                                        <span class="text-on-surface-variant w-10">{{ tx.fecha }}</span>
+                                        <strong class="text-on-surface truncate" title="{{ tx.nota }}">{{ tx.nota }}</strong>
+                                    </span>
+                                    <span class="flex items-center gap-3">
+                                        <span class="font-bold text-on-surface">${{ "%.2f"|format(tx.monto) }}</span>
+                                        {% if tx.editable %}
+                                            <button type="button" onclick="openEditTxModal('{{ tx.db_id }}', '{{ tx.nota }}', '{{ tx.monto }}')" class="material-symbols-outlined text-[14px] text-aviation-blue opacity-0 group-hover:opacity-100 transition-opacity" title="Editar Gasto">edit</button>
+                                        {% else %}
+                                            <span class="w-[14px]"></span> <!-- Espaciador para mantener alineación -->
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            {% else %}
+                                <p class="text-xs text-on-surface-variant font-data-mono py-2 text-center">Sin transacciones registradas en este periodo.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+
+
+<!-- Modal: Editar Transacción -->
+<div id="modal-edit-tx" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-6 border-l-4 border-aviation-blue shadow-lg" style="width: 350px;">
+        <h3 class="font-tactical text-aviation-blue text-lg mb-4 border-b border-outline-variant pb-2 uppercase tracking-widest">EDITAR REGISTRO</h3>
+        <form id="form-edit-tx" action="" method="POST" class="space-y-4">
+            <div>
+                <label class="text-[10px] text-on-surface-variant font-bold">NOTA / CONCEPTO:</label>
+                <input type="text" id="in-edit-tx-nota" name="nota" class="aero-input bg-white/50 text-sm font-bold mt-1" required>
+            </div>
+            <div>
+                <label class="text-[10px] text-on-surface-variant font-bold">MONTO ($):</label>
+                <input type="number" step="0.01" id="in-edit-tx-monto" name="monto" class="aero-input bg-white/80 text-lg font-bold mt-1 text-aviation-blue" required autofocus>
+            </div>
+            <div class="flex justify-end gap-4 mt-6 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-edit-tx').style.display='none'" class="text-on-surface-variant text-xs font-bold hover:text-error transition-colors">CANCELAR</button>
+                <button type="submit" class="bg-aviation-blue text-white px-4 py-2 font-bold text-xs clipped-corner hover:brightness-110">ACTUALIZAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openEditTxModal(id, nota, monto) {
+        document.getElementById('form-edit-tx').action = "/card/edit_tx/" + id;
+        document.getElementById('in-edit-tx-nota').value = nota;
+        document.getElementById('in-edit-tx-monto').value = monto;
+        document.getElementById('modal-edit-tx').style.display = 'flex';
+    }
+</script>
+
+{% endblock %}

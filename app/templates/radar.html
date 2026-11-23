@@ -1,0 +1,822 @@
+{% extends 'base.html' %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    .color-box { display: inline-block; width: 12px; height: 12px; margin-right: 8px; border-radius: 2px; }
+    @keyframes pulse-ufo { 0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7); } 70% { box-shadow: 0 0 10px 10px rgba(168, 85, 247, 0); } 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); } }
+    .ufo-btn { animation: pulse-ufo 2s infinite; }
+    
+    /* ===== ESTOS SON LOS ESTILOS FALTANTES DEL CARRUSEL ===== */
+    .card-carousel { display: flex; overflow-x: auto; gap: 20px; padding-bottom: 15px; scroll-snap-type: x mandatory; }
+    .card-carousel::-webkit-scrollbar { height: 8px; }
+    .card-carousel::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+    .card-carousel::-webkit-scrollbar-thumb { background: var(--hud-accent); border-radius: 4px; }
+    .carousel-item { flex: 0 0 320px; scroll-snap-align: start; }
+</style>
+
+<!-- FILA 1: FLUJO, GRÁFICA Y METAS -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+    
+    <!-- CASCADA DE EFECTIVO (4 COLUMNAS) -->
+    <div class="brushed-metal clipped-corner p-6 border border-outline-variant shadow-md lg:col-span-5 flex flex-col">
+        <div class="flex justify-between items-end border-b border-outline-variant pb-2 mb-4">
+            <h2 class="font-headline-md text-xl text-aviation-blue tracking-tight uppercase">Flujo de Efectivo <span class="text-xs text-on-surface-variant">(Este Mes)</span></h2>
+            <div class="text-right">
+                <span class="text-[9px] text-on-surface-variant">Q{{ fechas.quincena_numero }} [{{ fechas.fecha_exacta }}]</span>
+            </div>
+        </div>
+        
+        <!-- STEP 1: DISTRIBUCIÓN FIJA -->
+        <div class="border-b border-outline-variant/30 pb-3 mb-3">
+            <h3 class="text-[10px] text-on-surface-variant font-bold tracking-widest mb-2">1. DISTRIBUCIÓN DEL INGRESO</h3>
+            <div class="text-xs space-y-1 font-data-mono">
+                <div class="flex justify-between text-on-surface"><span>INGRESO NETO PROYECTADO:</span> <strong>${{ "%.2f"|format(ingreso_mensual) }}</strong></div>
+                <div class="flex justify-between text-success"><span class="flex items-center gap-1">- AHORRO PROGRAMADO:</span> <strong>-${{ "%.2f"|format(ahorros) }}</strong></div>
+                <div class="flex justify-between text-warning"><span class="flex items-center gap-1">- GASTOS FIJOS / SEGUROS:</span> <strong>-${{ "%.2f"|format(externos) }}</strong></div>
+                <div class="flex justify-between text-aviation-blue"><span class="flex items-center gap-1">- TANDAS ACTIVAS:</span> <strong>-${{ "%.2f"|format(tandas) }}</strong></div>
+                <div class="flex justify-between text-[#ec4899]"><span class="flex items-center gap-1">- MSI & SUBS (ESTE MES):</span> <strong>-${{ "%.2f"|format(msi_subs_activos) }}</strong></div>
+            </div>
+            
+            <div class="flex justify-between mt-2 pt-2 border-t border-outline-variant/30 font-bold text-sm">
+                <span class="text-on-surface">PRESUPUESTO DISPONIBLE (LÍQUIDO):</span>
+                <span class="{% if flujo_operativo < 0 %}text-error{% else %}text-success{% endif %}">${{ "%.2f"|format(flujo_operativo) }}</span>
+            </div>
+        </div>
+
+        <!-- STEP 2: GASTOS DEL DÍA A DÍA -->
+        <div class="mb-4">
+            <h3 class="text-[10px] text-on-surface-variant font-bold tracking-widest mb-2">2. GASTOS VARIABLES (TU CONTROL)</h3>
+            <div class="text-xs space-y-1 font-data-mono">
+                <div class="flex justify-between text-aviation-blue"><span class="flex items-center gap-1">- PRESUPUESTOS (GASTADO):</span> <strong>-${{ "%.2f"|format(presupuesto_gastado) }}</strong></div>
+                <div class="flex justify-between text-error"><span class="flex items-center gap-1">- GASTOS HORMIGA:</span> <strong>-${{ "%.2f"|format(gastos_extra) }}</strong></div>
+            </div>
+        </div>
+
+        <!-- RESULTADO FINAL -->
+        <div class="mt-auto border-t border-outline-variant pt-4">
+            <h3 class="text-[10px] uppercase text-on-surface-variant tracking-wider">Efectivo Libre Final</h3>
+            <h1 class="font-tactical text-4xl mt-1 {% if efectivo_libre < 0 %}text-error{% else %}text-aviation-blue{% endif %}">
+                $ {{ "%.2f"|format(efectivo_libre) }}
+            </h1>
+            <p class="text-[9px] text-on-surface-variant uppercase mt-1">Si agotas tus topes te sobrarán: <strong class="{% if margen_error < 0 %}text-error{% else %}text-on-surface{% endif %}">${{ "%.2f"|format(margen_error) }}</strong></p>
+        </div>
+    </div>
+
+    <!-- GRÁFICA (3 COLUMNAS) -->
+    <div class="brushed-metal clipped-corner p-6 border border-outline-variant shadow-md lg:col-span-3 flex flex-col items-center justify-between">
+        <h2 class="font-headline-md text-lg text-aviation-blue tracking-tight uppercase border-b border-outline-variant w-full text-center pb-2">Distribución</h2>
+        <div class="w-full flex-grow relative flex items-center justify-center min-h-[200px] mt-4">
+            <canvas id="cashflowChart"></canvas>
+        </div>
+    </div>
+
+    <!-- METAS ANUALES (4 COLUMNAS) -->
+    <div class="brushed-metal clipped-corner p-6 border border-outline-variant shadow-md lg:col-span-4 flex flex-col relative">
+        <button onclick="document.getElementById('modal-goal').style.display='flex'" class="absolute top-6 right-6 text-aviation-blue hover:text-primary font-bold text-sm">[E]</button>
+        <h2 class="font-headline-md text-lg text-aviation-blue tracking-tight uppercase border-b border-outline-variant pb-2 mb-6">Rendimiento Anual</h2>
+        
+        <div class="text-center mb-6">
+            <h3 class="text-[10px] uppercase text-on-surface-variant tracking-wider">Ahorro Total Acumulado</h3>
+            <h1 class="font-tactical text-3xl text-success mt-1">$ {{ "%.2f"|format(ahorro_total_real) }}</h1>
+        </div>
+
+        <div class="text-xs text-on-surface-variant space-y-2 mb-6">
+            <div class="flex justify-between"><span>FONDO EMPRESA:</span> <strong class="text-on-surface">${{ "%.2f"|format(fondo_empresa) }}</strong></div>
+            <div class="flex justify-between"><span>CUENTAS BANCARIAS:</span> <strong class="text-on-surface">${{ "%.2f"|format(saldo_bancos_ahorro) }}</strong></div>
+        </div>
+
+        <div class="mt-auto">
+            <div class="flex justify-between text-xs text-on-surface mb-1">
+                <span>META ANUAL</span><strong>${{ "%.2f"|format(meta_anual) }}</strong>
+            </div>
+            <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
+                <div class="bg-success h-full" style="width: {{ progreso_anual if progreso_anual <= 100 else 100 }}%;"></div>
+            </div>
+            <div class="text-center mt-2 text-[10px] text-success font-bold">
+                {{ "%.1f"|format(progreso_anual) }}% COMPLETADO
+                {% if progreso_anual > 100 %}<br><span class="text-aviation-blue">¡OBJETIVO SUPERADO! 🚀</span>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FILA 2: PRESUPUESTOS Y SISTEMA EXPERTO UFO -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+    
+    <!-- PRESUPUESTOS (7 COLUMNAS) -->
+    <div class="brushed-metal clipped-corner p-6 border border-outline-variant shadow-md lg:col-span-7">
+        <div class="flex justify-between items-end border-b border-outline-variant pb-2 mb-4">
+            <h2 class="font-headline-md text-lg text-aviation-blue tracking-tight uppercase">Presupuestos (Variables)</h2>
+            <button onclick="document.getElementById('modal-budget').style.display='flex'" class="text-[10px] border border-aviation-blue text-aviation-blue px-2 py-1 font-bold hover:bg-aviation-blue hover:text-white transition-colors">+ NUEVO</button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for b in presupuestos %}
+                {% set porcentaje = (b.monto_gastado / b.limite_maximo) * 100 %}
+                {% set color_barra = 'bg-error' if porcentaje >= 90 else ( 'bg-warning' if porcentaje >= 75 else 'bg-success') %}
+                {% set color_text = 'text-error' if porcentaje >= 90 else ( 'text-warning' if porcentaje >= 75 else 'text-success') %}
+                
+                <!-- Le agregamos cursor-pointer y el evento onclick para abrir los detalles -->
+                <div class="bg-white/60 border border-outline/20 p-4 relative group hover:border-aviation-blue/50 transition-colors cursor-pointer" onclick="openBudgetDetails('{{ b.id }}')">
+                    <div class="absolute top-2 right-2 flex gap-2">
+                        <!-- El stopPropagation evita que se abra la bitácora si solo querías darle al [+] o [E] -->
+                        <button onclick="event.stopPropagation(); openEditBudget('{{ b.id }}', '{{ b.nombre }}', '{{ b.limite_maximo }}', '{{ b.hangar_unit_id }}')" class="text-on-surface-variant hover:text-aviation-blue text-xs font-bold">[E]</button>
+                        <button onclick="event.stopPropagation(); openQuickAdd('{{ b.id }}', '{{ b.nombre }}', '{{ b.hangar_unit_id }}')" class="bg-aviation-blue text-white w-5 h-5 flex items-center justify-center font-bold hover:bg-primary-fixed-dim">+</button>
+                    </div>
+                    
+                    <h3 class="font-bold text-on-surface text-sm">{{ b.nombre }}</h3>
+                    <div class="text-[9px] text-on-surface-variant mb-2">VIA: {{ b.hangar_unit.institucion if b.hangar_unit else 'VARIOS' }}</div>
+                    
+                    <div class="flex justify-between items-end mb-1">
+                        <span class="font-tactical text-lg {{ color_text }}">${{ "%.2f"|format(b.monto_gastado) }}</span>
+                        <span class="text-xs text-on-surface-variant">/ ${{ "%.2f"|format(b.limite_maximo) }}</span>
+                    </div>
+                    <div class="w-full bg-surface-container-high h-1.5 overflow-hidden">
+                        <div class="h-full {{ color_barra }}" style="width: {{ porcentaje if porcentaje <= 100 else 100 }}%;"></div>
+                    </div>
+
+                    <!-- Datos Ocultos para Modal de Bitácora del Presupuesto -->
+                    <div id="data-budget-{{ b.id }}" style="display: none;">
+                        <div class="flex justify-between items-baseline border-b-2 border-aviation-blue pb-2 mb-4">
+                            <h2 class="font-tactical text-xl text-aviation-blue m-0">{{ b.nombre }}</h2>
+                            <strong class="text-on-surface text-base">${{ "%.2f"|format(b.monto_gastado) }} / ${{ "%.2f"|format(b.limite_maximo) }}</strong>
+                        </div>
+                        
+                        <table class="w-full text-left text-xs border-collapse font-data-mono">
+                            <thead class="text-on-surface-variant uppercase text-[10px] border-b border-outline-variant">
+                                <tr>
+                                    <th class="pb-2">FECHA</th>
+                                    <th class="pb-2">NOTA / LUGAR</th>
+                                    <th class="pb-2 text-right">MONTO</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tx in b.historial_gastos %}
+                                    <tr class="border-b border-outline-variant/30">
+                                        <td class="py-2 text-on-surface-variant">{{ tx.fecha.strftime('%d/%m') if tx.fecha else '--' }}</td>
+                                        <td class="py-2 text-on-surface font-bold">{{ tx.nota }}</td>
+                                        <td class="py-2 text-right text-error font-bold">${{ "%.2f"|format(tx.monto) }}</td>
+                                    </tr>
+                                {% else %}
+                                    <tr><td colspan="3" class="py-4 text-center text-on-surface-variant opacity-60">No hay gastos registrados en este presupuesto.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- SISTEMA EXPERTO & UFO (5 COLUMNAS) -->
+    <div class="brushed-metal clipped-corner p-6 border border-outline-variant shadow-md lg:col-span-5 flex flex-col justify-between relative overflow-hidden">
+        <div class="absolute -top-4 -right-4 w-24 h-24 bg-aviation-blue/10 rounded-full blur-3xl"></div>
+        
+        <div>
+            <div class="flex items-center gap-2 mb-4 border-b border-outline-variant pb-2">
+                <span class="material-symbols-outlined text-warning text-2xl">rocket_launch</span>
+                <h2 class="font-headline-md text-lg text-on-surface tracking-tight uppercase">Sistema Experto & I.A.</h2>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="bg-surface-container-low border-l-4 {% if porcentaje_msi > 15 %}border-error{% elif porcentaje_msi > 10 %}border-warning{% else %}border-success{% endif %} p-3 shadow-sm">
+                    <p class="text-[10px] font-bold tracking-widest {% if porcentaje_msi > 15 %}text-error{% elif porcentaje_msi > 10 %}text-warning{% else %}text-success{% endif %} mb-1">ANÁLISIS DE DEUDA (MSI: {{ "%.1f"|format(porcentaje_msi) }}%):</p>
+                    <p class="text-xs text-on-surface leading-tight">
+                        {% if porcentaje_msi > 15 %} PELIGRO CRÍTICO. Protocolo: CERO compras a meses nuevas.
+                        {% elif porcentaje_msi > 10 %} ADVERTENCIA. Evalúa si la próxima compra vale la pena.
+                        {% else %} ÓPTIMO. Meses sin intereses bajo control. {% endif %}
+                    </p>
+                </div>
+                <div class="bg-surface-container-low border-l-4 {% if gastos_extra > limite_hormiga %}border-error{% else %}border-success{% endif %} p-3 shadow-sm">
+                    <p class="text-[10px] font-bold tracking-widest {% if gastos_extra > limite_hormiga %}text-error{% else %}text-success{% endif %} mb-1">GASTO HORMIGA (${{ "%.2f"|format(gastos_extra) }} / Límite ${{ "%.2f"|format(limite_hormiga) }}):</p>
+                    <p class="text-xs text-on-surface leading-tight">
+                        {% if gastos_extra > limite_hormiga %} LOCKDOWN ACTIVADO. Bloquea salidas y antojos hasta fin de mes.
+                        {% else %} CONTROLADO. Tienes ${{ "%.2f"|format(limite_hormiga - gastos_extra) }} de margen libre. {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="alert('Conectando con Servidor AI (Gemini)...')" class="w-full mt-6 bg-on-surface text-white py-3 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-aviation-blue transition-all duration-300 relative group overflow-hidden">
+            <span class="relative z-10 flex items-center justify-center gap-2">🛸 [ INICIAR CONSULTA UFO I.A. ]</span>
+            <div class="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
+        </button>
+    </div>
+</div>
+
+<!-- FILA 3: CARRUSEL DE TARJETAS -->
+<div class="hud-panel" style="margin-top: 20px;">
+    <h2 class="hud-title" style="margin-bottom: 15px;">CARRUSEL DE FLOTA FINANCIERA (ESTADOS DE CUENTA)</h2>
+    
+    <div class="card-carousel">
+        {% for u in unidades %}
+            {% set id = u.id %}
+            {% set inst = u.institucion | upper %}
+            {% set card_color = '#a855f7' if 'NU' in inst else ('#ec4899' if 'LIVERPOOL' in inst else ('#ef4444' if 'SANTANDER' in inst else ('#0ea5e9' if 'BANAMEX' in inst else '#3b82f6'))) %}
+            
+            <!-- Usamos get para que no explote si no hay deuda, y default a 0 -->
+            {% set info = deuda_tarjetas.get(id) %}
+            {% set total_mensual = info.total_mensual if info else 0.0 %}
+            {% set cargos = info.cargos if info else [] %}
+            {% set credito_disp = u.limite_saldo - total_mensual %}
+
+            <div class="carousel-item brushed-metal clipped-corner p-5 border border-outline-variant group hover:border-aviation-blue/50 transition-all relative shadow-sm" onclick="openCardDetails('{{ id }}')" style="flex: 0 0 320px; scroll-snap-align: start; display: flex; flex-direction: column; cursor: pointer; border-left: 4px solid {{ card_color }};">
+                
+                <!-- AQUI METEMOS LA ALERTA RECON (Protegida) -->
+                {% if info and info.requiere_recon %}
+                    <button onclick="event.stopPropagation(); openReconModal('{{ id }}', '{{ u.nombre }}', '{{ info.deuda_a_conciliar }}', '{{ info.periodo_str if info else '' }}')" 
+                            class="absolute top-0 left-0 w-full h-full bg-warning/20 border-2 border-warning z-20 flex flex-col justify-center items-center backdrop-blur-[2px] transition-all hover:bg-warning/30">
+                        <span class="material-symbols-outlined text-warning text-4xl mb-2 animate-bounce">warning</span>
+                        <span class="font-tactical text-warning text-xl bg-black/80 px-4 py-1 border border-warning tracking-widest">REQUIERE RECON</span>
+                        <span class="font-data-mono text-xs text-on-surface mt-2 bg-black/80 px-2">Corte de mes detectado</span>
+                    </button>
+                {% endif %}
+
+                {% if u.tipo == 'AHORRO' or u.tipo == 'DEBITO' or 'NU' in inst %}
+                    <button onclick="event.stopPropagation(); openCardDeposit('{{ id }}', '{{ u.nombre }}')" style="position: absolute; top: 10px; right: 10px; background: #10b981; color: #fff; border: none; width: 25px; height: 25px; font-weight: bold; font-size: 1.1em; cursor: pointer; z-index: 10;">+$</button>
+                {% else %}
+                    <div style="position: absolute; top: 10px; right: 10px; display: flex; items-center; gap: 4px; z-index: 10;">
+                        <!-- Botón manual RECON en la tarjeta -->
+                        <button onclick="event.stopPropagation(); openReconModal('{{ id }}', '{{ u.nombre }}', '{{ info.deuda_a_conciliar if info else 0.0 }}', '{{ info.periodo_str if info else '' }}')" 
+                                class="bg-warning/20 text-warning border border-warning/50 hover:bg-warning hover:text-black transition-all px-2 py-0.5 text-[9px] font-bold font-data-mono flex items-center gap-1 rounded-[2px]" title="Pre-conciliar / Auditar Ciclo">
+                            <span class="material-symbols-outlined text-[13px]">fact_check</span> RECON
+                        </button>
+                        <!-- BOTÓN DE REGISTRAR GASTO RÁPIDO -->
+                        <button onclick="event.stopPropagation(); openCardSpend('{{ id }}', '{{ u.nombre }}')" style="background: {{ card_color }}; color: #fff; border: none; width: 25px; height: 25px; font-weight: bold; font-size: 1.2em; cursor: pointer;">-</button>
+                    </div>
+                {% endif %}
+
+                <div class="flex justify-between items-start mb-4">
+                    <div class="font-tactical text-lg" style="color: {{ card_color }};">{{ inst }}</div>
+                </div>
+                
+                <div class="font-data-mono text-sm text-on-surface tracking-widest opacity-80 mb-2">{{ u.nombre }}</div>
+                <div class="font-data-mono text-lg text-on-surface-variant tracking-widest mb-4">**** **** **** {{ "%04d"|format((id * 8375) % 9999) }}</div> 
+                
+                <div class="flex justify-between items-end border-t border-outline-variant/50 pt-2 mb-4">
+                    <div>
+                        <p class="font-data-mono text-[9px] text-on-surface-variant uppercase">DISPONIBLE</p>
+                        <p class="font-data-mono text-sm font-bold text-success">${{ "%.2f"|format(credito_disp) }}</p>
+                    </div>
+                </div>
+                
+                <div style="flex-grow: 1;"> 
+                    <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.8em; color: var(--on-surface-variant);">
+                        {% for cargo in cargos[:3] %}
+                            <li style="border-bottom: 1px solid rgba(0,0,0,0.05); padding: 5px 0; display: flex; justify-content: space-between; {% if cargo.pagado %}opacity: 0.4; text-decoration: line-through;{% endif %}">
+                                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%;">> {{ cargo.concepto }}</span>
+                                <span class="font-bold text-on-surface">${{ "%.2f"|format(cargo.monto) }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    {% if cargos|length > 3 %}
+                        <div style="text-align: center; font-size: 0.8em; color: var(--aviation-blue); margin-top: 5px;">... {{ cargos|length - 3 }} más</div>
+                    {% elif cargos|length == 0 %}
+                        <div style="text-align: center; font-size: 0.8em; color: var(--on-surface-variant); margin-top: 15px; opacity: 0.5;">Sin movimientos detectados.</div>
+                    {% endif %}
+                </div>
+                
+                <div style="margin-top: 15px; border-t border-outline-variant/50 pt-2 text-right">
+                    <span class="font-data-mono text-[9px] text-on-surface-variant uppercase">{% if u.tipo == 'AHORRO' %}INGRESADO MES:{% else %}A PAGAR:{% endif %}</span>
+                    <strong style="color: {{ card_color }}; font-size: 1.1em; display: block;">
+                        {% if u.ultimo_mes_conciliado == fechas.fecha_exacta.split('/')[1]|int %}
+                            ${{ "%.2f"|format(u.deuda_corte) }} <span class="text-[9px] text-on-surface-variant opacity-70 ml-1">(CONGELADO)</span>
+                        {% else %}
+                            ${{ "%.2f"|format(total_mensual) }}
+                        {% endif %}
+                    </strong>
+                </div>
+
+                <!-- Datos Ocultos para Modal (Se renderizan aunque estén en 0) -->
+                <div id="data-card-{{ id }}" style="display: none;">
+                    <div style="display: flex; justify-between: space-between; align-items: baseline; border-bottom: 2px solid {{ card_color }}; padding-bottom: 10px; margin-bottom: 15px;">
+                        <h2 style="color: {{ card_color }}; margin: 0;">{{ inst }} {{ u.nombre }}</h2>
+                        <strong style="color: var(--text-main); font-size: 1.2em;">TOTAL: ${{ "%.2f"|format(total_mensual) }}</strong>
+                    </div>
+                    
+                    <table style="width: 100%; text-align: left; font-size: 0.9em; border-collapse: collapse;">
+                        <thead style="color: var(--border-color); font-size: 0.8em;">
+                            <tr>
+                                <th style="padding-bottom: 10px;">DÍA</th>
+                                <th style="padding-bottom: 10px;">TIPO</th>
+                                <th style="padding-bottom: 10px;">CONCEPTO</th>
+                                <th style="padding-bottom: 10px; text-align: right;">MONTO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cargo in cargos %}
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); {% if cargo.pagado %}opacity: 0.4;{% endif %}">
+                                    <td style="padding: 10px 0; color: var(--border-color);">{{ cargo.dia }}</td>
+                                    <td style="padding: 10px 0;">
+                                        <span style="background: rgba(255,255,255,0.1); padding: 2px 5px; border-radius: 3px; font-size: 0.8em; font-weight: bold; color: {{ card_color }};">{{ cargo.tipo }}</span>
+                                    </td>
+                                    <td style="padding: 10px 0; color: var(--text-main); {% if cargo.pagado %}text-decoration: line-through;{% endif %}">{{ cargo.concepto }}</td>
+                                    <td style="padding: 10px 0; text-align: right; color: var(--text-main); font-weight: bold;">${{ "%.2f"|format(cargo.monto) }}</td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="4" style="padding: 20px; text-align: center; color: var(--border-color);">No hay cargos registrados.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- PASO A: Datos Ocultos para Modal RECON (Ciclo de Corte Anterior) -->
+                <div id="recon-data-{{ id }}" style="display: none;">
+                    {% set cargos_recon = info.cargos_a_conciliar if info else [] %}
+                    {% for cargo in cargos_recon %}
+                        {% set concepto_limpio = cargo.concepto | replace("'", " ") | replace('"', " ") %}
+                        
+                        <div class="recon-item" 
+                             data-id="{{ cargo.db_id }}" 
+                             data-clase="{{ cargo.clase }}" 
+                             data-dia="{{ cargo.dia }}"
+                             data-tipo="{{ cargo.tipo }}" 
+                             data-monto="{{ cargo.monto }}" 
+                             data-concepto="{{ concepto_limpio }}"
+                             data-budget="{{ 'true' if cargo.is_budget else 'false' }}">
+                            {{ cargo.concepto }}
+                        </div>
+                    {% endfor %}
+                </div>
+
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+
+<!-- ================= MODALES ================= -->
+
+<!-- Modal: Asignar Gasto a Presupuesto -->
+<div id="modal-assign-budget" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2500; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-8 border-l-4 border-aviation-blue shadow-[0_0_20px_rgba(0,71,171,0.3)]" style="width: 400px; max-width: 95%;">
+        <h3 class="font-tactical text-aviation-blue text-lg mb-4 border-b border-outline-variant pb-2 uppercase tracking-widest">RECLASIFICAR GASTO</h3>
+        
+        <p class="text-[10px] text-on-surface-variant mb-2 font-bold">ESTE GASTO DEJARÁ DE SER "HORMIGA" Y SE DESCONTARÁ DEL PRESUPUESTO QUE ELIJAS:</p>
+        <div class="bg-white/50 p-3 border border-outline-variant/30 mb-6">
+            <p id="assign-tx-info" class="font-data-mono text-xs text-on-surface font-bold"></p>
+        </div>
+
+        <form action="{{ url_for('radar.assign_tx_to_budget') }}" method="POST" class="space-y-4">
+            <input type="hidden" name="tx_id" id="in-assign-tx-id">
+            
+            <div>
+                <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">MOVER AL PRESUPUESTO:</label>
+                <select name="budget_id" class="aero-input bg-white/80 mt-1 font-bold text-sm" style="appearance: auto;" required>
+                    <option value="">SELECCIONAR...</option>
+                    {% for b in presupuestos %}
+                        <option value="{{ b.id }}">{{ b.nombre }} (Disp: ${{ "%.2f"|format(b.limite_maximo - b.monto_gastado) }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-4 mt-8 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-assign-budget').style.display='none'" class="text-on-surface-variant text-xs font-bold hover:text-error tracking-widest transition-colors">CANCELAR</button>
+                <button type="submit" class="bg-aviation-blue text-white px-6 py-2 font-bold text-xs clipped-corner hover:brightness-110 tracking-widest transition-all">RECLASIFICAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Editar Meta Ahorro Mensual -->
+<div id="modal-goal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-6 border border-success shadow-lg" style="width: 350px;">
+        <h3 class="font-tactical text-success text-lg mb-2 border-b border-outline-variant pb-2">CONFIGURAR META</h3>
+        <form action="{{ url_for('radar.update_goal') }}" method="POST" class="space-y-4">
+            <p class="text-[10px] text-on-surface-variant mb-4">El sistema multiplicará esto por 12 para calcular tu meta anual.</p>
+            <input type="number" step="0.01" name="meta_ahorro" value="{{ meta_anual / 12 }}" class="aero-input bg-white/50" required autofocus>
+            <div class="flex justify-end gap-4 mt-6 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-goal').style.display='none'" class="text-on-surface-variant text-sm font-bold hover:text-error">CANCELAR</button>
+                <button type="submit" class="bg-success text-white px-4 py-2 font-bold text-sm clipped-corner hover:brightness-110">ACTUALIZAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Presupuesto (Crear/Editar) -->
+<div id="modal-budget" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-6 border border-aviation-blue shadow-lg" style="width: 400px;">
+        <h3 id="budget-title" class="font-tactical text-aviation-blue text-lg mb-4 border-b border-outline-variant pb-2">PRESUPUESTO DE COMBATE</h3>
+        <form id="form-budget" action="{{ url_for('radar.add_budget') }}" method="POST" class="space-y-4">
+            <input type="text" id="in-bud-nom" name="nombre" placeholder="Nombre (Ej. GASOLINA)" class="aero-input bg-white/50" required>
+            <input type="number" step="0.01" id="in-bud-lim" name="limite" placeholder="Límite Máximo $" class="aero-input bg-white/50" required>
+            <div>
+                <label class="text-[10px] text-on-surface-variant font-bold">TARJETA PREDETERMINADA:</label>
+                <select id="in-bud-card" name="hangar_unit_id" class="aero-input bg-white/50 mt-1" style="appearance: auto;">
+                    <option value="">EFECTIVO / VARIAS</option>
+                    {% for u in unidades %}<option value="{{ u.id }}">{{ u.institucion }} - {{ u.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="flex justify-end gap-4 mt-6 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-budget').style.display='none'" class="text-on-surface-variant text-sm font-bold hover:text-error">CANCELAR</button>
+                <button type="submit" class="bg-aviation-blue text-white px-4 py-2 font-bold text-sm clipped-corner hover:brightness-110">GUARDAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Ver Bitácora del Presupuesto -->
+<div id="modal-budget-details" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="bg-surface-container-low clipped-corner p-8 border-l-4 border-aviation-blue shadow-2xl" style="width: 500px; max-width: 95%;">
+        <div id="budget-details-content"></div>
+        <div class="text-center mt-6 border-t border-outline-variant/50 pt-4">
+            <button onclick="document.getElementById('modal-budget-details').style.display='none'" class="text-on-surface-variant font-bold text-sm hover:text-error transition-colors tracking-widest">CERRAR BITÁCORA</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Gasto Presupuesto [+] -->
+<div id="modal-quick-add" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-6 border border-aviation-blue shadow-[0_0_15px_rgba(0,71,171,0.2)]" style="width: 350px;">
+        <h3 id="quick-add-title" class="font-tactical text-aviation-blue text-lg mb-4 border-b border-outline-variant pb-2 uppercase">REGISTRAR GASTO</h3>
+        <form action="{{ url_for('radar.spend_budget') }}" method="POST" class="space-y-4">
+            <input type="hidden" name="budget_id" id="in-budget-id">
+            <input type="number" step="0.01" name="monto" placeholder="Monto Gastado $" class="aero-input bg-white/80 font-bold text-lg" required autofocus>
+            <input type="text" name="nota" placeholder="Nota/Lugar" class="aero-input bg-white/50" required>
+            
+            <div class="flex gap-2">
+                <div class="flex-1">
+                    <label class="text-[10px] text-on-surface-variant font-bold">FECHA:</label>
+                    <input type="date" name="fecha" value="{{ hoy_str }}" class="aero-input bg-white/50 mt-1" required>
+                </div>
+            </div>
+            <div>
+                <label class="text-[10px] text-on-surface-variant font-bold">MÉTODO DE PAGO:</label>
+                <select name="hangar_unit_id" id="in-budget-tarjeta" class="aero-input bg-white/50 mt-1" style="appearance: auto;">
+                    <option value="">EFECTIVO / NINGUNA</option>
+                    {% for u in unidades %}<option value="{{ u.id }}">{{ u.institucion }} - {{ u.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="flex justify-end gap-4 mt-6 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-quick-add').style.display='none'" class="text-on-surface-variant text-sm font-bold hover:text-error">CANCELAR</button>
+                <button type="submit" class="bg-aviation-blue text-white px-4 py-2 font-bold text-sm clipped-corner hover:brightness-110">GUARDAR TICKET</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Gasto Directo a Tarjeta -->
+<div id="modal-card-spend" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-6 border border-error shadow-[0_0_15px_rgba(220,38,38,0.2)]" style="width: 350px;">
+        <h3 id="card-spend-title" class="font-tactical text-error text-lg mb-4 border-b border-error/30 pb-2 uppercase">CARGO A TARJETA</h3>
+        <form action="{{ url_for('radar.spend_card') }}" method="POST" class="space-y-5">
+            <!-- Selector oculto pero obligatorio si viene vacío -->
+            <div id="div-card-select" style="display: none;">
+                <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">TARJETA:</label>
+                <select name="hangar_unit_id" id="in-card-id" class="aero-input bg-white/50 mt-1 text-sm font-bold" style="appearance: auto;" required>
+                    <option value="">SELECCIONAR...</option>
+                    {% for u in unidades %}{% if u.tipo in ['CREDITO', 'DEPARTAMENTAL'] %}<option value="{{ u.id }}">{{ u.institucion }} - {{ u.nombre }}</option>{% endif %}{% endfor %}
+                </select>
+            </div>
+            
+            <p class="text-[9px] text-on-surface-variant">Usa el signo <strong class="text-error">- (menos)</strong> para registrar un Abono, Reembolso o Cashback.</p>
+            
+            <!-- EL INPUT AHORA ACEPTA NÚMEROS NEGATIVOS -->
+            <input type="number" step="0.01" name="monto" placeholder="Monto $ (Ej. -1500 o 500)" class="aero-input bg-white/80 font-bold text-xl" required autofocus>
+            <input type="text" name="nota" placeholder="Concepto (Ej. Amazon, Cashback)" class="aero-input bg-white/50 text-sm font-bold" required>
+            <div>
+                <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">CATEGORÍA:</label>
+                <select name="categoria" class="aero-input bg-white/50 mt-1 text-sm font-bold" style="appearance: auto;" required>
+                    <option value="">SELECCIONAR CATEGORÍA...</option>
+                    {% for cat in categorias %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">FECHA:</label>
+                <input type="date" name="fecha" value="{{ hoy_str }}" class="aero-input bg-white/50 mt-1 text-sm font-bold" required>
+            </div>
+            <div class="flex justify-end gap-4 mt-8 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-card-spend').style.display='none'" class="text-on-surface-variant text-xs font-bold hover:text-error tracking-widest transition-colors">CANCELAR</button>
+                <button type="submit" class="bg-error text-white px-6 py-2 font-bold text-xs clipped-corner hover:brightness-110 tracking-widest transition-all">REGISTRAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Depositar a Ahorro -->
+<div id="modal-card-deposit" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-6 border border-success shadow-[0_0_15px_rgba(16,185,129,0.2)]" style="width: 350px;">
+        <h3 id="card-deposit-title" class="font-tactical text-success text-lg mb-4 border-b border-success/30 pb-2 uppercase">INGRESAR DINERO</h3>
+        <form action="{{ url_for('radar.deposit_card') }}" method="POST" class="space-y-4">
+            <input type="hidden" name="hangar_unit_id" id="in-deposit-id">
+            <input type="number" step="0.01" name="monto" placeholder="Monto a Ingresar $" class="aero-input bg-white/80 font-bold text-lg" required autofocus>
+            <div class="flex justify-end gap-4 mt-6 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-card-deposit').style.display='none'" class="text-on-surface-variant text-sm font-bold hover:text-error">CANCELAR</button>
+                <button type="submit" class="bg-success text-white px-4 py-2 font-bold text-sm clipped-corner hover:brightness-110">ABONAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Ver Estado de Cuenta Detallado (Se queda con diseño oscuro para contraste) -->
+<div id="modal-card-details" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="bg-surface-container-high clipped-corner p-6 border border-outline-variant shadow-2xl" style="width: 500px; max-width: 95%; max-height: 80vh; overflow-y: auto;">
+        <div id="card-details-content"></div>
+        <div class="text-center mt-6 border-t border-outline-variant/50 pt-4">
+            <button onclick="document.getElementById('modal-card-details').style.display='none'" class="text-on-surface-variant font-bold text-sm hover:text-error transition-colors">CERRAR ESTADO DE CUENTA</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: REPORTE DE MISIÓN (CONCILIACIÓN DE 2 COLUMNAS) -->
+<div id="modal-recon" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(8px);">
+    <div class="brushed-metal clipped-corner border-l-4 border-warning shadow-[0_0_30px_rgba(234,179,8,0.3)] w-[850px] max-w-[95%] flex flex-col md:flex-row overflow-hidden max-h-[85vh]">
+        
+        <!-- COLUMNA IZQUIERDA: CÁLCULO Y FORMULARIO -->
+        <div class="p-8 flex-1 border-r border-outline-variant/30 flex flex-col justify-between">
+            <button onclick="document.getElementById('modal-recon').style.display='none'" class="absolute top-4 left-4 material-symbols-outlined text-on-surface-variant hover:text-error transition-colors">close</button>
+            
+            <div>
+                <div class="flex items-center gap-3 border-b border-warning/30 pb-3 mb-6">
+                    <span class="material-symbols-outlined text-warning text-3xl">fact_check</span>
+                    <div>
+                        <h3 class="font-tactical text-warning text-xl m-0 tracking-widest uppercase">REPORTE DE MISIÓN</h3>
+                        <p id="recon-card-name" class="font-data-mono text-[10px] text-on-surface-variant uppercase"></p>
+                        <p id="recon-card-period" class="font-data-mono text-[9px] text-aviation-blue font-bold uppercase"></p>
+                    </div>
+                </div>
+
+                <form id="form-recon" action="{{ url_for('radar.recon_card') }}" method="POST" class="space-y-6">
+                    <input type="hidden" name="hangar_unit_id" id="in-recon-id">
+                    
+                    <div class="bg-black/10 dark:bg-white/10 p-4 border border-outline-variant/30 shadow-inner">
+                        <p class="font-data-mono text-[10px] text-on-surface-variant mb-1 uppercase tracking-widest">Deuda calculada por el sistema:</p>
+                        <p id="recon-expected-debt" class="font-tactical text-3xl text-on-surface">$0.00</p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <p class="font-data-mono text-[10px] text-on-surface uppercase">1. Abre la app de tu banco. ¿Cuál es el "Saldo al Corte" exacto?</p>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant font-bold text-lg">$</span>
+                            <input type="number" step="0.01" name="deuda_real" placeholder="Ej. 8500.50" class="aero-input bg-white/80 text-xl font-bold pl-8 focus:bg-white transition-colors" required autofocus>
+                        </div>
+                        
+                        <p class="font-data-mono text-[10px] text-on-surface uppercase mt-6">2. ¿Vas a hacer un abono (pago) a la tarjeta HOY?</p>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-success font-bold text-lg">$</span>
+                            <input type="number" step="0.01" name="abono_realizado" placeholder="0.00" class="aero-input bg-success/10 text-success text-xl font-bold pl-8 focus:bg-success/20 transition-colors">
+                        </div>
+                        <p class="font-label-caps text-[9px] text-on-surface-variant text-right">El sistema restará este abono a tu deuda final de Agosto.</p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Botones alineados abajo -->
+            <div class="flex justify-between items-end border-t border-outline-variant/50 pt-6 mt-6">
+                <!-- Botón de Agregar -->
+                <button type="button" onclick="switchToQuickAdd()" class="text-aviation-blue font-data-mono text-[10px] font-bold hover:underline flex items-center gap-1 uppercase tracking-widest transition-colors">
+                    <span class="material-symbols-outlined text-sm">add_circle</span> Faltó un gasto
+                </button>
+                
+                <!-- Botón de Sellar -->
+                <button type="button" onclick="document.getElementById('form-recon').submit();" class="bg-warning text-black px-6 py-3 font-bold text-xs clipped-corner hover:brightness-110 tracking-widest transition-all uppercase shadow-md">Sellar Ciclo</button>
+            </div>
+        </div>
+
+        <!-- COLUMNA DERECHA: AUDITORÍA DE GASTOS -->
+        <div class="p-8 flex-1 bg-surface-container-high/50 flex flex-col h-full overflow-hidden">
+            <h3 class="font-label-caps text-on-surface-variant text-[11px] uppercase tracking-widest border-b border-outline-variant/50 pb-2 mb-4">Bitácora del Ciclo de Corte (Conciliación)</h3>
+            <p class="text-[9px] font-data-mono text-on-surface-variant mb-4 leading-relaxed">
+                Compara esta lista con los movimientos de la app de tu banco. Si falta alguno, agrégalo antes de sellar el ciclo para que las matemáticas cuadren al centavo.
+            </p>
+            
+            <!-- CONTENEDOR SCROLLEABLE CON ALTURA LÍMITE -->
+            <div id="recon-transactions-list" class="overflow-y-auto pr-2 space-y-2 flex-1 max-h-[380px] scroll-panel">
+                <!-- JavaScript inyectará las filas aquí -->
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<script>
+    // NUEVA FUNCIÓN INTELIGENTE PARA EL RECON
+    function openReconModal(id, nombre, deuda_esperada, periodo_str) {
+        document.getElementById('in-recon-id').value = id;
+        document.getElementById('recon-card-name').innerText = nombre;
+        if (periodo_str) {
+            document.getElementById('recon-card-period').innerText = "PERÍODO DE CORTE: " + periodo_str;
+        } else {
+            document.getElementById('recon-card-period').innerText = "";
+        }
+        document.getElementById('recon-expected-debt').innerText = "$" + parseFloat(deuda_esperada).toFixed(2);
+        
+        const hiddenDataDiv = document.getElementById('recon-data-' + id);
+        const transactionListContainer = document.getElementById('recon-transactions-list');
+        transactionListContainer.innerHTML = '';
+
+        if (hiddenDataDiv) {
+            const items = hiddenDataDiv.querySelectorAll('.recon-item');
+            
+            if (items.length > 0) {
+                items.forEach(item => {
+                    const db_id = item.getAttribute('data-id');
+                    const clase = item.getAttribute('data-clase'); 
+                    const dia = item.getAttribute('data-dia');
+                    const tipoHtml = item.getAttribute('data-tipo');
+                    const conceptoLimpio = item.getAttribute('data-concepto'); 
+                    const conceptoVisual = item.innerHTML.trim(); 
+                    const isBudget = item.getAttribute('data-budget') === 'true';
+                    const montoValue = parseFloat(item.getAttribute('data-monto'));
+                    
+                    const colorMonto = montoValue < 0 ? 'text-success' : 'text-on-surface';
+                    const formatoMonto = montoValue < 0 ? '-$' + Math.abs(montoValue).toFixed(2) : '$' + montoValue.toFixed(2);
+                    
+                    let actionBtns = '';
+                    if (clase === 'tx') {
+                        let assignBtn = '';
+                        
+                        if (!isBudget && montoValue > 0) {
+                            assignBtn = `
+                                <button type="button" onclick="openAssignBudgetModal('${db_id}', '${conceptoLimpio}', '${montoValue}')" 
+                                        class="material-symbols-outlined text-[14px] text-aviation-blue/50 hover:text-aviation-blue transition-colors mr-1" 
+                                        title="Asignar a Presupuesto">folder_special</button>
+                            `;
+                        }
+
+                        actionBtns = `
+                            ${assignBtn}
+                            <form action="/card/delete_tx/${db_id}" method="POST" style="margin: 0; display: inline;">
+                                <button type="submit" class="material-symbols-outlined text-[14px] text-error/50 hover:text-error transition-colors" title="Borrar Transacción">cancel</button>
+                            </form>`;
+                    }
+
+                    let budgetBadge = isBudget ? `<span class="bg-aviation-blue/10 text-aviation-blue border border-aviation-blue/30 px-1 py-0.5 rounded-[2px] text-[8px] font-bold mr-1">PRESUPUESTO</span>` : '';
+
+                    const txCard = `
+                        <div class="bg-white/60 border border-outline-variant/30 p-2 flex justify-between items-center shadow-sm hover:border-aviation-blue/50 transition-colors">
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 text-center text-[9px] text-on-surface-variant font-bold">${dia}</div>
+                                <span class="bg-aviation-blue/10 text-aviation-blue border border-aviation-blue/30 px-1 py-0.5 rounded-[2px] text-[8px] font-bold">${tipoHtml}</span>
+                                <div class="font-data-mono text-[10px] text-on-surface truncate max-w-[170px] leading-tight flex items-center" title="${conceptoVisual}">${budgetBadge}<span>${conceptoVisual}</span></div>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <div class="font-data-mono text-xs font-bold ${colorMonto} mr-2">${formatoMonto}</div>
+                                ${actionBtns}
+                            </div>
+                        </div>
+                    `;
+                    transactionListContainer.innerHTML += txCard;
+                });
+            } else {
+                transactionListContainer.innerHTML = '<div class="text-[10px] font-data-mono text-on-surface-variant text-center mt-10">Sin movimientos en este ciclo de corte.</div>';
+            }
+        }
+
+        document.getElementById('modal-recon').style.display = 'flex';
+    }
+
+</script>
+
+<script>
+    // Presupuestos
+    function openQuickAdd(id, nombre, id_tarjeta_predeterminada) {
+        document.getElementById('in-budget-id').value = id;
+        document.getElementById('quick-add-title').innerText = "GASTO EN: " + nombre;
+        
+        // Colocar la tarjeta predeterminada (si la hay)
+        document.getElementById('in-budget-tarjeta').value = (id_tarjeta_predeterminada !== 'None') ? id_tarjeta_predeterminada : '';
+        
+        document.getElementById('modal-quick-add').style.display = 'flex';
+    }
+
+    function openAssignBudgetModal(tx_id, concepto, monto) {
+        // Cerramos el RECON temporalmente
+        document.getElementById('modal-recon').style.display = 'none';
+        
+        document.getElementById('in-assign-tx-id').value = tx_id;
+        document.getElementById('assign-tx-info').innerText = concepto + " ($" + monto + ")";
+        document.getElementById('modal-assign-budget').style.display = 'flex';
+    }
+
+    function openEditBudget(id, nom, lim, card_id) {
+        document.getElementById('form-budget').action = "/budget/edit/" + id;
+        document.getElementById('budget-title').innerText = "EDITAR PRESUPUESTO";
+        document.getElementById('in-bud-nom').value = nom;
+        document.getElementById('in-bud-lim').value = lim;
+        if(card_id && card_id !== 'None') document.getElementById('in-bud-card').value = card_id;
+        document.getElementById('modal-budget').style.display = 'flex';
+    }
+
+    // Tarjetas Directas
+    function openCardSpend(id, nombre) {
+        document.getElementById('div-card-select').style.display = 'none';
+        document.getElementById('in-card-id').value = id;
+        document.getElementById('card-spend-title').innerText = "CARGO A: " + nombre;
+        document.getElementById('modal-card-spend').style.display = 'flex';
+    }
+
+    function switchToQuickAdd() {
+        // Obtenemos el ID de la tarjeta que estábamos conciliando
+        const id_actual = document.getElementById('in-recon-id').value;
+        const nombre_actual = document.getElementById('recon-card-name').innerText;
+        
+        // Cerramos el modal de Recon
+        document.getElementById('modal-recon').style.display = 'none';
+        
+        // Abrimos el modal de Gasto pasándole el ID correcto para que no explote Python
+        openCardSpend(id_actual, nombre_actual);
+    }
+    function openCardDetails(id) {
+        const content = document.getElementById('data-card-' + id).innerHTML;
+        document.getElementById('card-details-content').innerHTML = content;
+        document.getElementById('modal-card-details').style.display = 'flex';
+    }
+
+    const ctx = document.getElementById('cashflowChart').getContext('2d');
+    const libre_grafica = {{ efectivo_libre }} > 0 ? {{ efectivo_libre }} : 0;
+    const presupuesto_gastado = {{ presupuesto_gastado }};
+    const presupuesto_no_tocado = {{ presupuestos_limite }} - presupuesto_gastado;
+
+    // Configuramos Chart.js para que use nuestra fuente táctica por defecto
+    Chart.defaults.font.family = "'JetBrains Mono', monospace";
+    Chart.defaults.color = '#718096'; // var(--outline)
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: [
+                'Ahorros & Tandas', 
+                'Obligaciones Ext.', 
+                'Suscripciones', 
+                'Compras a MSI',
+                'Presup. Gastado',
+                'Presup. Disponible',
+                'Gastos Hormiga', 
+                'Efectivo Libre'
+            ],
+            datasets: [{
+                data: [
+                    {{ ahorros }}, {{ externos }}, {{ suscripciones|default(0) }}, {{ pago_msi|default(msi_subs_activos) }},
+                    presupuesto_gastado, presupuesto_no_tocado > 0 ? presupuesto_no_tocado : 0,
+                    {{ gastos_extra }}, libre_grafica
+                ],
+                backgroundColor: [
+                    '#10b981', // success
+                    '#f59e0b', // warning
+                    '#ef4444', // error (rojo claro)
+                    '#ec4899', // rosa liverpool
+                    '#3b82f6', // azul
+                    'rgba(59, 130, 246, 0.2)', // azul transparente
+                    '#dc2626', // error fuerte
+                    '#e2e8f0'  // gris claro
+                ],
+                borderWidth: 2,
+                borderColor: '#f8fafc' 
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%', // Hace el agujero del centro más grande y moderno
+            plugins: {
+                legend: { 
+                    display: true, 
+                    position: 'bottom',
+                    labels: { 
+                        color: '#4a5568', // on-surface-variant
+                        font: { size: 9, family: "'JetBrains Mono', monospace", weight: 'bold' },
+                        padding: 15,
+                        usePointStyle: true, // Cambia el cuadrito por un círculo táctico
+                        pointStyle: 'rect' // o 'circle' si prefieres
+                    } 
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(26, 32, 44, 0.95)', // Fondo táctico oscuro
+                    titleFont: { size: 10, family: "'JetBrains Mono', monospace" },
+                    bodyFont: { size: 14, family: "'JetBrains Mono', monospace", weight: 'bold' },
+                    padding: 12,
+                    cornerRadius: 2,
+                    borderColor: '#0047AB', // Borde azul aviación
+                    borderWidth: 1,
+                    displayColors: true,
+                    boxWidth: 8,
+                    boxHeight: 8,
+                    callbacks: {
+                        label: function(context) {
+                            return ' $' + context.parsed.toLocaleString('es-MX', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            animation: {
+                animateScale: true,
+                animateRotate: true
+            }
+        }
+    });
+
+    function openCardDeposit(id, nombre) {
+        document.getElementById('in-deposit-id').value = id;
+        document.getElementById('card-deposit-title').innerText = "ABONAR A: " + nombre;
+        document.getElementById('modal-card-deposit').style.display = 'flex';
+    }
+
+    function openBudgetDetails(id) {
+        const content = document.getElementById('data-budget-' + id).innerHTML;
+        document.getElementById('budget-details-content').innerHTML = content;
+        document.getElementById('modal-budget-details').style.display = 'flex';
+    }
+</script>
+{% endblock %}

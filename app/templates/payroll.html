@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="hud-panel">
+    <h2 class="hud-title">MISSION BRIEFING: SALARY TACTICS</h2>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+        
+        <!-- PANEL IZQUIERDO: FORMULARIO DE ENTRADA -->
+        <form method="POST" action="{{ url_for('payroll.index') }}">
+            <!-- AÑADE ESTA LÍNEA AQUÍ -->
+            <input type="hidden" name="action" value="update_params">
+
+            <h3 style="color: var(--hud-accent);">> PARÁMETROS DE VUELO</h3>
+            
+            <div style="margin-bottom: 15px;">
+                <label>Sueldo Bruto Quincenal</label><br>
+                <input type="number" step="0.01" name="grossSalary" value="{{ user.sueldo_bruto_quincenal }}" class="aero-input">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label>ISR Retenido (CFDI Recibo)</label><br>
+                <input type="number" step="0.01" name="isrCfdi" value="{{ user.isr_cfdi }}" class="aero-input">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label>IMSS (CFDI Recibo)</label><br>
+                <input type="number" step="0.01" name="imssCfdi" value="{{ user.imss_cfdi }}" class="aero-input">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label>Aportación Fondo de Ahorro</label><br>
+                <input type="number" step="0.01" name="savingsContribution" value="{{ user.aportacion_ahorro }}" class="aero-input">
+            </div>
+            
+            <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label>Fecha Inicio (Antigüedad)</label><br>
+                    <input type="date" name="startDate" value="{{ user.fecha_inicio }}" class="aero-input">
+                </div>
+                <div style="flex: 1;">
+                    <label>Días Vacaciones</label><br>
+                    <input type="number" name="vacationDays" value="{{ user.dias_vacaciones }}" class="aero-input">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label>Otras Deducciones</label><br>
+                <input type="number" step="0.01" name="otherDeductions" value="{{ user.otras_deducciones }}" class="aero-input">
+            </div>
+
+            <!-- NUEVA SECCIÓN DE METAS QUE FALTABA -->
+            <hr style="border-color: var(--border-color); opacity: 0.3; margin: 20px 0;">
+            <h4 style="color: var(--hud-accent); margin-top: 0;">[ METAS OPERATIVAS ]</h4>
+            
+            <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label>Gasto Diario (Meta)</label><br>
+                    <input type="number" step="0.01" name="dailyGoal" value="{{ user.meta_gasto_diario }}" class="aero-input">
+                </div>
+                <div style="flex: 1;">
+                    <label>Ahorro Mensual (Meta)</label><br>
+                    <input type="number" step="0.01" name="monthlyGoal" value="{{ user.meta_ahorro_mensual }}" class="aero-input">
+                </div>
+            </div>
+            <!-- FIN DE SECCIÓN NUEVA -->
+
+            <button type="submit" style="width: 100%; padding: 15px; background: var(--hud-accent); color: var(--bg-color); font-weight: bold; border: none; cursor: pointer; font-family: inherit; margin-top: 10px;">
+                ACTUALIZAR DATOS DE VUELO
+            </button>
+        </form>
+
+        <!-- PANEL DERECHO: ESTADÍSTICAS Y ANÁLISIS TÁCTICO -->
+        <div>
+            <h3 style="color: var(--hud-accent);">> ESTADÍSTICAS DE CARGA</h3>
+            
+            <div style="border: 1px solid var(--hud-accent); padding: 15px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>NETO REAL</span>
+                    <strong style="color: var(--hud-accent); font-size: 1.2em;">$ {{ "%.2f"|format(neto_real) }}</strong>
+                </div>
+                <hr style="border-color: var(--border-color); opacity: 0.3;">
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>ISR CALCULADO (MOTOR APP)</span>
+                    <strong>$ {{ "%.2f"|format(isr_app.isr_total) }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>BRACKET SAT 2026</span>
+                    <strong>{{ "%.2f"|format(isr_app.porcentaje) }}%</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>DIFERENCIA ISR (APP vs SAT)</span>
+                    <strong style="color: {% if isr_diff|abs > 1 %}var(--alert-danger){% else %}var(--hud-accent){% endif %};">
+                        $ {{ "%.2f"|format(isr_diff) }}
+                    </strong>
+                </div>
+            </div>
+
+            <h3 style="color: var(--hud-accent);">> PROYECCIÓN ANUAL</h3>
+            <div style="border: 1px solid var(--border-color); padding: 15px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span>AGUINALDO (ESTIMADO)</span>
+                    <strong>$ {{ "%.2f"|format(aguinaldo) }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                    <span>PRIMA VACACIONAL</span>
+                    <strong>$ {{ "%.2f"|format(prima) }}</strong>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <span>FONDO AHORRO (MATCH 100%)</span>
+                    <span style="font-size: 0.8em; color: var(--border-color);">CICLO JUL-JUL [{{ "%.1f"|format(progreso_ahorro) }}%]</span>
+                </div>
+                <div class="energy-bar-bg">
+                    <div class="energy-bar-fill" style="width: {{ progreso_ahorro }}%;"></div>
+                    <span class="energy-bar-text">$ {{ "%.2f"|format(ahorro_acumulado) }}</span>
+                </div>
+            </div>
+
+            <!-- NUEVO BOTÓN DE SIMULACIÓN -->
+            <button type="button" onclick="document.getElementById('modal-simulacion').style.display='flex'" 
+                    style="width: 100%; margin-top: 20px; padding: 15px; background: transparent; color: #a855f7; border: 2px solid #a855f7; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 1.1em; transition: all 0.3s;">
+                [+] SIMULAR DEPÓSITO DE ALTO IMPACTO (BONOS)
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE SIMULACIÓN DE BONOS / CALCULADORA INVERSA -->
+<div id="modal-simulacion" style="display: {% if show_modal %}flex{% else %}none{% endif %}; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="hud-panel" style="width: 500px; max-width: 95%; max-height: 90vh; overflow-y: auto; background: var(--panel-bg); border-color: #a855f7; box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);">
+        
+        <h2 style="color: #a855f7; margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+            {% if simulacion.es_inverso %}RECIBO DESCIFRADO{% else %}ANÁLISIS DE DEPÓSITO IDEAL{% endif %}
+        </h2>
+        
+        <!-- CALCULADORA INVERSA -->
+        <div style="background: rgba(0,0,0,0.2); padding: 15px; border: 1px solid #a855f7; margin-bottom: 20px;">
+            <p style="margin-top: 0; font-size: 0.85em; color: var(--border-color);">¿Ya te depositaron? Ingresa el monto exacto que recibiste en el banco y el sistema adivinará cuánto te pagaron de bono y cuánto te quitó el SAT.</p>
+            <form method="POST" action="{{ url_for('payroll.index') }}" style="display: flex; gap: 10px;">
+                <input type="hidden" name="action" value="reverse_calc">
+                <input type="number" step="0.01" name="deposito_real" placeholder="Ej. 64500.00" class="aero-input" style="flex: 1;" required>
+                <button type="submit" style="background: #a855f7; color: #fff; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer;">DESCIFRAR</button>
+            </form>
+        </div>
+
+        <!-- RESULTADOS MATEMÁTICOS -->
+        <div style="font-size: 0.9em;">
+            <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+                <span>Quincena Base (Bruta):</span> <strong style="color: var(--text-main);">${{ "%.2f"|format(user.sueldo_bruto_quincenal) }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
+                <span style="color: var(--hud-accent);">[+] Bono Descifrado (Bruto):</span> 
+                <strong style="color: var(--hud-accent);">+${{ "%.2f"|format(simulacion.bono_bruto) }} <span style="color:#10b981; font-size:0.8em;">({{ "%.1f"|format(simulacion.dias_bono) }} Días)</span></strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+                <span>BASE GRAVABLE PARA EL SAT:</span> <strong>${{ "%.2f"|format(simulacion.bruto_total) }}</strong>
+            </div>
+            
+            <div style="background: rgba(220, 38, 38, 0.1); border-left: 4px solid var(--alert-danger); padding: 10px; margin: 10px 0;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--alert-danger);">[-] ISR Retenido (El golpe):</span> 
+                    <strong style="color: var(--alert-danger);">-${{ "%.2f"|format(simulacion.isr_retenido) }}</strong>
+                </div>
+                <span style="font-size: 0.8em; color: var(--border-color);">
+                    El SAT te subió al bracket del <strong style="color: #eab308;">{{ "%.2f"|format(simulacion.bracket) }}%</strong>. 
+                    Pagaste ${{ "%.2f"|format(simulacion.impacto_isr) }} extra de puros impuestos por juntar los pagos.
+                </span>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed rgba(255,255,255,0.1);">
+                <span style="color: #10b981;">[+] Liquidación Fondo de Ahorro (Exento):</span> <strong style="color: #10b981;">+${{ "%.2f"|format(simulacion.ahorro_entregado) }}</strong>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center; border-top: 2px solid #a855f7; padding-top: 15px;">
+            <h3 style="margin: 0; color: var(--border-color); font-size: 0.8em;">
+                {% if simulacion.es_inverso %}DEPÓSITO QUE INGRESASTE{% else %}DEPÓSITO NETO ESPERADO{% endif %}
+            </h3>
+            <h1 style="font-size: 3rem; margin: 5px 0; color: #a855f7;">
+                $ {{ "%.2f"|format(simulacion.deposito_final) }}
+            </h1>
+        </div>
+
+        <div style="text-align: center; margin-top: 25px;">
+            <button type="button" onclick="document.getElementById('modal-simulacion').style.display='none'" 
+                    style="background: transparent; color: var(--text-main); border: 1px solid var(--border-color); padding: 10px 30px; font-weight: bold; cursor: pointer; font-family: inherit;">
+                CERRAR
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

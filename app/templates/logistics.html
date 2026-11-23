@@ -1,0 +1,443 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    .type-pill { display: inline-block; padding: 5px 10px; margin: 2px; border: 1px solid var(--outline-variant); color: var(--on-surface-variant); cursor: pointer; font-size: 0.8em; border-radius: 4px; transition: all 0.2s; font-family: 'JetBrains Mono', monospace; font-weight: bold; }
+    input[type="radio"]:checked + .type-pill { background: var(--aviation-blue); color: #fff; border-color: var(--aviation-blue); }
+    input[type="radio"] { display: none; }
+    
+    .scroll-panel { max-height: 70vh; overflow-y: auto; padding-right: 10px; }
+    .scroll-panel::-webkit-scrollbar { width: 4px; }
+    .scroll-panel::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+    .scroll-panel::-webkit-scrollbar-thumb { background: var(--aviation-blue); border-radius: 4px; }
+</style>
+
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+    
+    <!-- COLUMNA 1: TANDAS Y MSI (5 COLUMNAS) -->
+    <div class="xl:col-span-5 flex flex-col gap-6">
+        
+        <!-- TANDAS -->
+        <div class="brushed-metal clipped-corner p-6 border border-outline-variant shadow-md">
+            <div class="absolute top-2 right-4 font-data-mono text-[8px] text-on-surface-variant/40 select-none">[ DEPLOY_MOD: TANDA_SYS ]</div>
+            <div class="flex justify-between items-end mb-6 border-b border-outline-variant pb-2">
+                <h2 class="font-headline-md text-lg text-aviation-blue tracking-tight uppercase">Tandas y Ahorros</h2>
+                <button onclick="openModalAddTanda()" class="bg-aviation-blue text-white px-3 py-1 font-label-caps text-[10px] uppercase hover:brightness-110 transition-all active:scale-95 flex items-center gap-1 shadow-sm">
+                    <span class="material-symbols-outlined text-[14px]">add</span> + TANDA
+                </button>
+            </div>
+            
+            <div class="space-y-4 scroll-panel" style="max-height: 30vh;">
+                {% for t_data in tandas %}
+                    {% set t = t_data.db %}
+                    {% set st = t_data.estado %}
+                    {% set progreso = (st.pagadas / t.total_quincenas) * 100 %}
+                    
+                    <div class="bg-black/5 dark:bg-white/5 p-4 border-l-4 border-aviation-blue relative shadow-sm hover:border-primary-fixed-dim transition-colors">
+                        <!-- CONTROLES -->
+                        <div class="absolute top-2 right-2 flex gap-2">
+                            <button onclick="openModalEditTanda('{{ t.id }}', '{{ t.nombre }}', '{{ t.monto_quincenal }}', '{{ t.total_quincenas }}', '{{ t.fecha_inicio }}', '{{ t.mi_turno }}')" class="material-symbols-outlined text-[16px] text-on-surface-variant hover:text-aviation-blue transition-colors">edit</button>
+                            <form action="{{ url_for('logistics.delete_tanda', id=t.id) }}" method="POST" style="margin: 0;">
+                                <button type="submit" class="material-symbols-outlined text-[16px] text-error/70 hover:text-error transition-colors">cancel</button>
+                            </form>
+                        </div>
+
+                        <div class="flex justify-between items-start mb-2 pr-12">
+                            <div>
+                                <p class="font-label-caps text-[11px] text-aviation-blue">{{ t.nombre | upper }}</p>
+                                <p class="font-data-mono text-[10px] text-on-surface-variant">Depósito: ${{ "%.2f"|format(t.monto_quincenal) }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-data-mono text-[11px] text-on-surface font-bold">RECIBES: ${{ "%.2f"|format(t.total_quincenas * t.monto_quincenal) }}</p>
+                                <p class="font-label-caps text-[9px] text-aviation-blue">Turno: {{ t.mi_turno }} {% if st.pagadas >= t.mi_turno %}<span class="bg-success/20 text-success px-1 ml-1 text-[8px]">[COBRADA]</span>{% endif %}</p>
+                            </div>
+                        </div>
+
+                        <div class="w-full h-4 bg-surface-container-high border border-outline-variant/30 relative overflow-hidden mt-3">
+                            <div class="h-full {% if st.completada %}bg-success{% else %}bg-aviation-blue{% endif %} transition-all duration-500" style="width: {{ progreso }}%;"></div>
+                            <span class="absolute inset-0 flex items-center justify-center font-data-mono text-[9px] {% if progreso > 50 %}text-white{% else %}text-on-surface{% endif %} font-bold mix-blend-difference">PAGOS: {{ st.pagadas }}/{{ t.total_quincenas }} ({{ "%.0f"|format(progreso) }}%)</span>
+                        </div>
+
+                        <div class="flex justify-between items-center mt-2 font-data-mono text-[9px]">
+                            {% if not st.completada %}
+                                <span class="text-on-surface-variant">SIGUIENTE: {{ st.siguiente_fecha }}</span>
+                                <span class="{% if st.dias_restantes <= 3 %}text-error{% else %}text-aviation-blue{% endif %} font-bold">T-MINUS {{ st.dias_restantes }} DÍAS</span>
+                            {% else %}
+                                <span class="text-success font-bold w-full text-center">CICLO COMPLETADO</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="font-data-mono text-xs text-on-surface-variant opacity-60">No hay tandas activas.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- COMPRAS A MESES (MSI) -->
+        <div class="brushed-metal clipped-corner p-6 border border-outline-variant shadow-md">
+            <div class="flex justify-between items-end mb-6 border-b border-outline-variant pb-2">
+                <h2 class="font-headline-md text-lg text-aviation-blue tracking-tight uppercase">Compras a Meses (MSI)</h2>
+                <button onclick="openModalAddMSI()" class="bg-transparent border border-aviation-blue text-aviation-blue px-3 py-1 font-label-caps text-[10px] uppercase hover:bg-aviation-blue hover:text-white transition-all active:scale-95 shadow-sm">
+                    + REGISTRAR MSI
+                </button>
+            </div>
+            
+            <div class="space-y-3 scroll-panel" style="max-height: 35vh;">
+                {% for msi in msi_list %}
+                    {% set prog_msi = (msi.meses_pagados / msi.meses_totales) * 100 %}
+                    {% set inst = msi.hangar_unit.institucion | upper %}
+                    {% set c_color = '#a855f7' if 'NU' in inst else ('#ec4899' if 'LIVERPOOL' in inst else ('#ef4444' if 'SANTANDER' in inst else ('#0ea5e9' if 'BANAMEX' in inst else '#3b82f6'))) %}
+                    
+                    <div class="p-3 border border-outline-variant bg-black/5 dark:bg-white/5 hover:bg-black/10 transition-colors shadow-sm relative group">
+                        
+                        <!-- CONTROLES -->
+                        <div class="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="openModalEditMSI('{{ msi.id }}', '{{ msi.concepto }}', '{{ msi.monto_total }}', '{{ msi.meses_totales }}', '{{ msi.meses_pagados }}', '{{ msi.hangar_unit_id }}')" class="material-symbols-outlined text-[14px] text-on-surface-variant hover:text-aviation-blue">edit</button>
+                            <form action="{{ url_for('logistics.delete_msi', id=msi.id) }}" method="POST" style="margin: 0;">
+                                <button type="submit" class="material-symbols-outlined text-[14px] text-error/70 hover:text-error">cancel</button>
+                            </form>
+                        </div>
+
+                        <div class="flex justify-between font-label-caps mb-1 pr-12">
+                            <span class="text-on-surface font-bold truncate">{{ msi.concepto }}</span>
+                            <span style="color: {{ c_color }};" class="font-bold">{{ inst }}</span>
+                        </div>
+                        <div class="flex justify-between font-data-mono text-[10px] mb-2">
+                            <span class="text-on-surface-variant">Mensualidad: <strong style="color: {{ c_color }};">${{ "%.2f"|format(msi.mensualidad) }}</strong></span>
+                            <span class="text-on-surface">Total: ${{ "%.2f"|format(msi.monto_total) }}</span>
+                        </div>
+                        <div class="h-2 bg-surface-container-high border border-outline-variant/30 w-full overflow-hidden mb-2">
+                            <div class="h-full transition-all duration-500" style="width: {{ prog_msi }}%; background-color: {{ c_color }};"></div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="font-data-mono text-[9px] text-on-surface-variant">MESES: {{ msi.meses_pagados }}/{{ msi.meses_totales }}</span>
+                            {% if msi.meses_pagados < msi.meses_totales %}
+                                <a href="{{ url_for('logistics.pagar_msi', id=msi.id) }}" style="color: {{ c_color }};" class="text-[9px] font-label-caps uppercase tracking-widest font-bold hover:brightness-125 transition-all">+ PAGAR MENSUALIDAD</a>
+                            {% else %}
+                                <span class="font-label-caps text-[9px] text-success font-bold">DEUDA SALDADA</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="font-data-mono text-xs text-on-surface-variant opacity-60">No hay compras a MSI.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- COLUMNA 2: CARGAS Y SUBSCRIPCIONES (7 COLUMNAS) -->
+    <div class="xl:col-span-7">
+        <section class="brushed-metal beveled p-panel-padding h-full border border-outline-variant relative shadow-md flex flex-col">
+            <div class="absolute bottom-10 right-10 opacity-5 pointer-events-none">
+                <span class="material-symbols-outlined text-[160px] text-aviation-blue">local_shipping</span>
+            </div>
+            
+            <div class="flex justify-between items-end mb-6 border-b border-outline-variant pb-2">
+                <h2 class="font-headline-md text-lg text-aviation-blue tracking-tight uppercase flex items-center gap-2">
+                    <span class="material-symbols-outlined">package_2</span> Logística de Salidas
+                </h2>
+                <button onclick="openModalExpenseAdd()" class="bg-aviation-blue text-white px-4 py-2 font-label-caps text-[10px] uppercase hover:brightness-110 transition-all active:scale-95 shadow-md">
+                    + REGISTRAR CARGA
+                </button>
+            </div>
+
+            <!-- TABLA HEADER -->
+            <div class="grid grid-cols-12 gap-4 px-6 pb-2 border-b border-outline-variant font-label-caps text-[9px] text-on-surface-variant font-bold">
+                <div class="col-span-6 uppercase">Manifest / Identification</div>
+                <div class="col-span-3 uppercase">Frequency / Source</div>
+                <div class="col-span-3 text-right uppercase">Amount ($)</div>
+            </div>
+
+            <!-- LISTA DE GASTOS CON PADDING INTERNO -->
+            <div class="space-y-3 mt-4 scroll-panel flex-grow px-4 py-2" style="max-height: 60vh;">
+                {% set total_outflow = namespace(value=0) %}
+                {% set total_reserved = namespace(value=0) %}
+
+                {% for g in gastos %}
+                    {% set acc_color = 'var(--outline)' %}
+                    {% set bg_color = 'bg-black/5 dark:bg-white/5' %}
+                    {% if g.tipo == 'SAVINGS' %} {% set acc_color = '#10b981' %} {% set bg_color = 'bg-success/5' %}
+                    {% elif g.tipo == 'CARD_PAYMENT' %} {% set acc_color = '#eab308' %}
+                    {% elif g.tipo == 'SUBSCRIPTION' %} {% set acc_color = '#a855f7' %}
+                    {% elif g.tipo == 'BUDGET' %} {% set acc_color = '#0ea5e9' %}
+                    {% endif %}
+
+                    <!-- Sumas para el Footer Telemetry -->
+                    {% set gasto_mensual = g.monto * 2 if g.frecuencia == 'QUINCENAL' else (g.monto * 4 if g.frecuencia == 'SEMANAL' else g.monto) %}
+                    {% if g.tipo == 'SAVINGS' %}
+                        {% set total_reserved.value = total_reserved.value + gasto_mensual %}
+                    {% else %}
+                        {% set total_outflow.value = total_outflow.value + gasto_mensual %}
+                    {% endif %}
+
+                    <div class="grid grid-cols-12 gap-4 items-center {{ bg_color }} p-3 border border-outline-variant hover:border-aviation-blue transition-all group shadow-sm relative overflow-hidden">
+                        <!-- Barra de color a la izquierda -->
+                        <div class="absolute left-0 top-0 w-1 h-full" style="background-color: {{ acc_color }};"></div>
+                        
+                        <!-- Col 1: ID -->
+                        <div class="col-span-6 pl-2">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="px-1.5 py-0.5 text-[8px] font-label-caps font-bold uppercase" style="color: {{ acc_color }}; border: 1px solid {{ acc_color }};">{{ g.tipo }}</span>
+                                {% if g.dia_cobro %}<span class="text-[9px] font-data-mono text-aviation-blue font-bold">DÍA {{ g.dia_cobro }}</span>{% endif %}
+                                <h3 class="font-data-mono text-xs font-bold text-on-surface truncate" title="{{ g.concepto }}">{{ g.concepto }}</h3>
+                            </div>
+                            <p class="font-label-caps text-[9px] text-on-surface-variant ml-14 truncate">
+                                {% if g.hangar_unit %}CARGO A: {{ g.hangar_unit.institucion }} ({{ g.hangar_unit.nombre }}){% elif g.destinatario %}DESTINO: {{ g.destinatario }}{% endif %}
+                            </p>
+                        </div>
+                        
+                        <!-- Col 2: Freq -->
+                        <div class="col-span-3">
+                            <p class="font-label-caps text-[9px] text-on-surface uppercase">FREQ: <span class="text-aviation-blue font-bold">{{ g.frecuencia }}</span></p>
+                        </div>
+                        
+                        <!-- Col 3: Amount + Controls -->
+                        <div class="col-span-3 text-right">
+                            <p class="font-data-mono text-lg font-bold" style="color: {% if g.tipo == 'SAVINGS' %}{{ acc_color }}{% else %}var(--text-main){% endif %};">${{ "%.2f"|format(g.monto) }}</p>
+                            
+                            <!-- CONTROLES OCULTOS HASTA HOVER -->
+                            <div class="flex justify-end gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="openModalEditExpense('{{ g.id }}', '{{ g.tipo }}', '{{ g.concepto }}', '{{ g.destinatario }}', '{{ g.monto }}', '{{ g.frecuencia }}', '{{ g.hangar_unit_id }}', '{{ g.dia_cobro }}')" class="material-symbols-outlined text-[16px] text-on-surface-variant hover:text-aviation-blue">edit</button>
+                                <form action="{{ url_for('logistics.delete_expense', id=g.id) }}" method="POST" style="margin: 0;">
+                                    <button type="submit" class="material-symbols-outlined text-[16px] text-error/70 hover:text-error">cancel</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="font-data-mono text-xs text-on-surface-variant opacity-60">No hay cargas recurrentes registradas.</p>
+                {% endfor %}
+            </div>
+
+            <!-- FOOTER TELEMETRY -->
+            <div class="mt-auto border-t border-outline-variant pt-4 flex justify-between items-center">
+                <div class="flex gap-4">
+                    <div class="text-center border-r border-outline-variant pr-6">
+                        <p class="font-label-caps text-[8px] text-on-surface-variant uppercase font-bold">Total Outflow (Mes)</p>
+                        <p class="font-data-mono text-error font-bold">${{ "%.2f"|format(total_outflow.value) }}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="font-label-caps text-[8px] text-on-surface-variant uppercase font-bold">Reserved Savings (Mes)</p>
+                        <p class="font-data-mono text-success font-bold">${{ "%.2f"|format(total_reserved.value) }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 bg-success rounded-full animate-pulse shadow-[0_0_5px_rgba(16,185,129,0.5)]"></div>
+                    <p class="font-data-mono text-[9px] text-on-surface-variant font-bold">SYNC_COMPLETE</p>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<!-- ================= MODALES METÁLICOS ================= -->
+
+<!-- Modal Tanda -->
+<div id="modal-tanda" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-8 border-l-4 border-aviation-blue shadow-[0_0_20px_rgba(0,71,171,0.2)]" style="width: 450px;">
+        <h3 id="tanda-title" class="font-tactical text-aviation-blue text-xl mb-4 border-b border-outline-variant pb-3 uppercase tracking-widest">CONFIGURAR NUEVA TANDA</h3>
+        <form id="form-tanda" action="{{ url_for('logistics.add_tanda') }}" method="POST" class="space-y-5">
+            <input type="text" id="in-tanda-nombre" name="nombre" placeholder="Nombre Tanda (Ej. Familiar)" class="aero-input bg-white/50 text-sm font-bold" required>
+            <div class="flex gap-4">
+                <div class="flex-1">
+                    <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">MONTO QUINCENAL:</label>
+                    <input type="number" step="0.01" id="in-tanda-monto" name="monto" class="aero-input bg-white/50 mt-1 text-sm font-bold" required>
+                </div>
+                <div class="flex-1">
+                    <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">TOTAL QUINCENAS:</label>
+                    <input type="number" id="in-tanda-total" name="total" class="aero-input bg-white/50 mt-1 text-sm font-bold" required>
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <div class="flex-1">
+                    <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">FECHA INICIO:</label>
+                    <input type="date" id="in-tanda-fecha" name="fecha_inicio" class="aero-input bg-white/50 mt-1 text-sm font-bold" required>
+                </div>
+                <div class="flex-1">
+                    <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">MI TURNO:</label>
+                    <input type="number" id="in-tanda-turno" name="turno" placeholder="Ej. 1" class="aero-input bg-white/50 mt-1 text-sm font-bold">
+                </div>
+            </div>
+            <div class="flex justify-end gap-4 mt-8 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-tanda').style.display='none'" class="text-on-surface-variant text-xs font-bold hover:text-error tracking-widest transition-colors">CANCELAR</button>
+                <button type="submit" class="bg-aviation-blue text-white px-6 py-2 font-bold text-xs clipped-corner hover:brightness-110 tracking-widest transition-all">CONFIRMAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal MSI -->
+<div id="modal-msi" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-8 border-l-4 border-[#ec4899] shadow-[0_0_20px_rgba(236,72,153,0.2)]" style="width: 500px;">
+        <h3 id="msi-title" class="font-tactical text-[#ec4899] text-xl mb-4 border-b border-outline-variant pb-3 uppercase tracking-widest">REGISTRAR COMPRA A MSI</h3>
+        <form id="form-msi" action="{{ url_for('logistics.add_msi') }}" method="POST" class="space-y-5">
+            <input type="text" id="in-msi-concepto" name="concepto" placeholder="Concepto de Compra" class="aero-input bg-white/50 text-sm font-bold" required>
+            <div>
+                <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">TARJETA DE CRÉDITO:</label>
+                <select id="in-msi-tarjeta" name="hangar_unit_id" class="aero-input bg-white/50 mt-1 text-sm font-bold" style="appearance: auto;" required>
+                    <option value="">SELECCIONAR...</option>
+                    {% for u in unidades %}{% if u.tipo in ['CREDITO', 'DEPARTAMENTAL'] %}
+                        <option value="{{ u.id }}">{{ u.institucion }} - {{ u.nombre }}</option>
+                    {% endif %}{% endfor %}
+                </select>
+            </div>
+            <div class="flex gap-4">
+                <div class="flex-[2]">
+                    <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">DEUDA TOTAL $:</label>
+                    <input type="number" step="0.01" id="in-msi-monto" name="monto_total" class="aero-input bg-white/50 mt-1 text-sm font-bold" required>
+                </div>
+                <div class="flex-1">
+                    <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">MESES:</label>
+                    <input type="number" id="in-msi-meses" name="meses_totales" placeholder="Ej. 12" class="aero-input bg-white/50 mt-1 text-sm font-bold" required>
+                </div>
+                <div class="flex-1">
+                    <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">PAGADOS:</label>
+                    <input type="number" id="in-msi-pagados" name="meses_pagados" placeholder="0" class="aero-input bg-white/50 mt-1 text-sm font-bold" value="0">
+                </div>
+            </div>
+            <div class="flex justify-end gap-4 mt-8 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-msi').style.display='none'" class="text-on-surface-variant text-xs font-bold hover:text-error tracking-widest transition-colors">CANCELAR</button>
+                <button type="submit" class="bg-[#ec4899] text-white px-6 py-2 font-bold text-xs clipped-corner hover:brightness-110 tracking-widest transition-all">CONFIRMAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Gasto -->
+<div id="modal-expense" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="brushed-metal clipped-corner p-8 border-l-4 border-aviation-blue shadow-[0_0_20px_rgba(0,71,171,0.2)]" style="width: 450px;">
+        <h3 class="font-tactical text-aviation-blue text-xl mb-4 border-b border-outline-variant pb-3 uppercase tracking-widest">REGISTRAR CARGA / SUSCRIPCIÓN</h3>
+        <form id="form-expense" action="{{ url_for('logistics.add_expense') }}" method="POST" class="space-y-5">
+            
+            <div class="bg-white/50 border border-outline-variant p-3 shadow-inner">
+                <label class="text-[10px] font-bold text-on-surface-variant block mb-2 tracking-widest">TIPO DE SALIDA:</label>
+                <div class="flex flex-wrap gap-2">
+                    <label><input type="radio" name="tipo" value="EXTERNAL" checked onchange="toggleExpenseFields()"><span class="type-pill">EXTERNAL</span></label>
+                    <label><input type="radio" name="tipo" value="SAVINGS" onchange="toggleExpenseFields()"><span class="type-pill text-success">SAVINGS</span></label>
+                    <label><input type="radio" name="tipo" value="CARD_PAYMENT" onchange="toggleExpenseFields()"><span class="type-pill text-warning">CARD_PAY</span></label>
+                    <label><input type="radio" name="tipo" value="SUBSCRIPTION" onchange="toggleExpenseFields()"><span class="type-pill text-[#a855f7]">SUBSCRIPTION</span></label>
+                    <label><input type="radio" name="tipo" value="BUDGET" onchange="toggleExpenseFields()"><span class="type-pill text-aviation-blue">BUDGET</span></label>
+                </div>
+            </div>
+
+            <div id="field-vinculo" style="display: none;">
+                <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">VINCULAR A UNIDAD:</label>
+                <select name="hangar_unit_id" class="aero-input bg-white/50 mt-1 text-sm font-bold" style="appearance: auto;">
+                    <option value="">SELECCIONAR UNIDAD</option>
+                    {% for u in unidades %}<option value="{{ u.id }}">{{ u.institucion }} - {{ u.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            
+            <input type="text" name="concepto" placeholder="Concepto (ej. Netflix, Seguro)" class="aero-input bg-white/50 text-sm font-bold" required>
+            <div id="field-destinatario"><input type="text" name="destinatario" placeholder="Destinatario" class="aero-input bg-white/50 text-sm font-bold"></div>
+            
+            <div class="flex gap-4">
+                <div class="flex-[2]">
+                    <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">MONTO $:</label>
+                    <input type="number" step="0.01" name="monto" class="aero-input bg-white/80 text-xl font-bold mt-1" required>
+                </div>
+                <div id="in-dia-mes" class="flex-1" style="display: none;">
+                    <label class="text-[10px] text-on-surface-variant font-bold tracking-widest">DÍA COBRO:</label>
+                    <input type="number" name="dia_cobro" placeholder="Ej. 15" class="aero-input bg-white/50 mt-1 text-sm font-bold">
+                </div>
+            </div>
+
+            <div>
+                <label class="text-[10px] font-bold text-on-surface-variant block mb-2 tracking-widest">FRECUENCIA:</label>
+                <div class="flex gap-2">
+                    <label><input type="radio" id="freq-quin" name="frecuencia" value="QUINCENAL" checked><span class="type-pill">QUINCENAL</span></label>
+                    <label><input type="radio" id="freq-men" name="frecuencia" value="MENSUAL"><span class="type-pill">MENSUAL</span></label>
+                    <label><input type="radio" id="freq-sem" name="frecuencia" value="SEMANAL"><span class="type-pill">SEMANAL</span></label>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-4 mt-8 border-t border-outline-variant/50 pt-4">
+                <button type="button" onclick="document.getElementById('modal-expense').style.display='none'" class="text-on-surface-variant text-xs font-bold hover:text-error tracking-widest transition-colors">CANCELAR</button>
+                <button type="submit" class="bg-aviation-blue text-white px-6 py-2 font-bold text-xs clipped-corner hover:brightness-110 tracking-widest transition-all">CONFIRMAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // --- LÓGICA DE GASTOS ---
+    function toggleExpenseFields() {
+        const tipo = document.querySelector('input[name="tipo"]:checked').value;
+        const fieldVinculo = document.getElementById('field-vinculo');
+        const fieldDestinatario = document.getElementById('field-destinatario');
+        const inDiaMes = document.getElementById('in-dia-mes');
+
+        fieldVinculo.style.display = 'none';
+        fieldDestinatario.style.display = 'none';
+        inDiaMes.style.display = 'none';
+
+        if (tipo === 'EXTERNAL') fieldDestinatario.style.display = 'block';
+        else fieldVinculo.style.display = 'block'; 
+
+        if (tipo === 'SUBSCRIPTION') {
+            inDiaMes.style.display = 'block';
+            document.querySelector('input[name="frecuencia"][value="MENSUAL"]').checked = true;
+        }
+    }
+
+    function openModalExpenseAdd() {
+        document.getElementById('form-expense').action = "{{ url_for('logistics.add_expense') }}";
+        document.getElementById('form-expense').reset();
+        document.getElementById('modal-expense').style.display = 'flex';
+        toggleExpenseFields();
+    }
+
+    function openModalEditExpense(id, tipo, concepto, dest, monto, freq, hangar_id, dia) {
+        document.getElementById('form-expense').action = "/logistics/expense/edit/" + id;
+        document.querySelector(`input[name="tipo"][value="${tipo}"]`).checked = true;
+        document.querySelector('input[name="concepto"]').value = concepto;
+        document.querySelector('input[name="monto"]').value = monto;
+        document.querySelector(`input[name="frecuencia"][value="${freq}"]`).checked = true;
+        
+        if (dest !== 'None') document.querySelector('input[name="destinatario"]').value = dest;
+        if (hangar_id !== 'None') document.querySelector('select[name="hangar_unit_id"]').value = hangar_id;
+        if (dia !== 'None') document.querySelector('input[name="dia_cobro"]').value = dia;
+        
+        document.getElementById('modal-expense').style.display = 'flex';
+        toggleExpenseFields();
+    }
+
+    // --- LÓGICA DE TANDAS ---
+    function openModalAddTanda() {
+        document.getElementById('tanda-title').innerText = "CONFIGURAR NUEVA TANDA";
+        document.getElementById('form-tanda').action = "{{ url_for('logistics.add_tanda') }}";
+        document.getElementById('form-tanda').reset();
+        document.getElementById('modal-tanda').style.display = 'flex';
+    }
+
+    function openModalEditTanda(id, nombre, monto, total, fecha, turno) {
+        document.getElementById('tanda-title').innerText = "EDITAR TANDA";
+        document.getElementById('form-tanda').action = "/logistics/tanda/edit/" + id;
+        document.getElementById('in-tanda-nombre').value = nombre;
+        document.getElementById('in-tanda-monto').value = monto;
+        document.getElementById('in-tanda-total').value = total;
+        document.getElementById('in-tanda-fecha').value = fecha;
+        document.getElementById('in-tanda-turno').value = turno;
+        document.getElementById('modal-tanda').style.display = 'flex';
+    }
+
+    // --- LÓGICA DE MSI ---
+    function openModalAddMSI() {
+        document.getElementById('msi-title').innerText = "REGISTRAR COMPRA A MSI";
+        document.getElementById('form-msi').action = "{{ url_for('logistics.add_msi') }}";
+        document.getElementById('form-msi').reset();
+        document.getElementById('in-msi-pagados').value = "0";
+        document.getElementById('modal-msi').style.display = 'flex';
+    }
+
+    function openModalEditMSI(id, concepto, monto_total, meses, pagados, hangar_id) {
+        document.getElementById('msi-title').innerText = "EDITAR COMPRA MSI";
+        document.getElementById('form-msi').action = "/logistics/msi/edit/" + id;
+        document.getElementById('in-msi-concepto').value = concepto;
+        document.getElementById('in-msi-monto').value = monto_total;
+        document.getElementById('in-msi-meses').value = meses;
+        document.getElementById('in-msi-pagados').value = pagados;
+        document.getElementById('in-msi-tarjeta').value = hangar_id;
+        document.getElementById('modal-msi').style.display = 'flex';
+    }
+</script>
+{% endblock %}

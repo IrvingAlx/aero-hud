@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AERO HUD | Mando Financiero</title>
+    
+    <!-- FUENTES TÁCTICAS -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <!-- TAILWIND CSS (MOTOR VISUAL) -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "surface": "#f8fafc",
+                "outline-variant": "#cbd5e0",
+                "outline": "#718096",
+                "primary": "#0047AB",
+                "error": "#dc2626",
+                "surface-container-high": "#e2e8f0",
+                "surface-container-low": "#f8fafc",
+                "on-surface": "#1a202c",
+                "on-surface-variant": "#4a5568",
+                "aviation-blue": "#0047AB",
+                "success": "#10b981",
+                "warning": "#eab308"
+              },
+              fontFamily: {
+                "data-mono": ["JetBrains Mono"],
+                "headline-md": ["Space Grotesk"],
+                "tactical": ["Orbitron"]
+              }
+            }
+          }
+        }
+    </script>
+
+    <!-- EFECTOS ESPECIALES (Metal, Esquinas, Radar) -->
+    <style>
+        body {
+            background-color: #e2e4e9;
+            background-image: 
+                linear-gradient(rgba(0, 71, 171, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 71, 171, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            overflow-x: hidden;
+        }
+        .clipped-corner { clip-path: polygon(0 0, 95% 0, 100% 15%, 100% 100%, 5% 100%, 0 85%); }
+        .brushed-metal {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #dee2e6 100%);
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .brushed-metal::after {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(45deg, rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 1px, transparent 1px, transparent 8px);
+            pointer-events: none;
+        }
+        .scanline {
+            width: 100%; height: 2px; background: rgba(0, 71, 171, 0.08);
+            position: fixed; top: 0; animation: scan 8s linear infinite; pointer-events: none; z-index: 60;
+        }
+        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+        .hud-panel { /* Clase puente para mantener compatibilidad con HTML viejo */
+            @apply brushed-metal clipped-corner p-6 border border-outline-variant shadow-md;
+        }
+        .aero-input {
+            @apply w-full bg-transparent border-b border-outline-variant text-on-surface font-data-mono py-2 focus:border-aviation-blue focus:outline-none transition-all;
+        }
+    </style>
+</head>
+<body class="text-on-surface font-data-mono min-h-screen">
+    <div class="scanline"></div>
+
+    <!-- NAVBAR AERO -->
+    <nav class="flex justify-between items-center w-full px-6 h-16 z-50 fixed top-0 border-b border-outline-variant bg-surface/90 backdrop-blur-lg shadow-sm">
+        <div class="flex items-center gap-8">
+            <span class="font-tactical text-2xl tracking-tighter text-aviation-blue">AERO HUD</span>
+            <div class="hidden md:flex gap-6">
+                <a href="{{ url_for('radar.sitrep') }}" class="font-data-mono text-xs uppercase font-bold {% if request.endpoint == 'radar.sitrep' %}text-aviation-blue border-b-2 border-aviation-blue pb-1{% else %}text-on-surface-variant/60 hover:text-aviation-blue{% endif %} flex items-center gap-1"><span class="material-symbols-outlined text-sm">radar</span> RADAR</a>
+                <a href="{{ url_for('radar.conciliacion') }}" class="font-data-mono text-xs uppercase font-bold {% if request.endpoint == 'radar.conciliacion' %}text-aviation-blue border-b-2 border-aviation-blue pb-1{% else %}text-on-surface-variant/60 hover:text-aviation-blue{% endif %} flex items-center gap-1"><span class="material-symbols-outlined text-sm">fact_check</span> CONCILIACIÓN</a>
+                <a href="{{ url_for('hangar.index') }}" class="font-data-mono text-xs uppercase font-bold {% if request.endpoint == 'hangar.index' %}text-aviation-blue border-b-2 border-aviation-blue pb-1{% else %}text-on-surface-variant/60 hover:text-aviation-blue{% endif %} flex items-center gap-1"><span class="material-symbols-outlined text-sm">credit_card</span> HANGAR & NÓMINA</a>
+                <a href="{{ url_for('logistics.index') }}" class="font-data-mono text-xs uppercase font-bold {% if request.endpoint == 'logistics.index' %}text-aviation-blue border-b-2 border-aviation-blue pb-1{% else %}text-on-surface-variant/60 hover:text-aviation-blue{% endif %} flex items-center gap-1"><span class="material-symbols-outlined text-sm">inventory_2</span> LOGÍSTICA</a>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="text-right hidden md:block">
+                <p class="font-data-mono text-[10px] text-aviation-blue font-bold leading-tight">CDR. DEMO</p>
+                <p class="text-[8px] font-data-mono text-aviation-blue animate-pulse leading-tight">STATUS: COMBAT READY</p>
+            </div>
+            <button class="material-symbols-outlined text-on-surface-variant hover:text-aviation-blue transition-colors">dark_mode</button>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-12 px-6 max-w-[1600px] mx-auto">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
